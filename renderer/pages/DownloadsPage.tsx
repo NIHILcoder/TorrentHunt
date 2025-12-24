@@ -4,15 +4,15 @@
  * Main downloads management page with compact/detailed view modes.
  */
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Download, DownloadStats } from '../../shared/types';
 import { canPause, canResume } from '../../shared/state-machine';
-import { 
-  Button, 
-  Icon, 
-  Input, 
-  ProgressBar, 
-  StatusBadge, 
+import {
+  Button,
+  Icon,
+  Input,
+  ProgressBar,
+  StatusBadge,
   ToastContainer,
   EmptyState,
   FilePreview,
@@ -38,11 +38,11 @@ const formatSpeed = (bytesPerSecond: number): string => {
 const formatEta = (seconds: number | null): string => {
   if (seconds === null || seconds <= 0) return '--';
   if (seconds > 86400) return '> 1 day';
-  
+
   const h = Math.floor(seconds / 3600);
   const m = Math.floor((seconds % 3600) / 60);
   const s = seconds % 60;
-  
+
   if (h > 0) return `${h}h ${m}m`;
   if (m > 0) return `${m}m ${s}s`;
   return `${s}s`;
@@ -53,16 +53,16 @@ const formatDate = (dateInput: string | Date): string => {
   const now = new Date();
   const diffMs = now.getTime() - date.getTime();
   const diffMins = Math.floor(diffMs / 60000);
-  
+
   if (diffMins < 1) return 'Just now';
   if (diffMins < 60) return `${diffMins}m ago`;
-  
+
   const diffHours = Math.floor(diffMins / 60);
   if (diffHours < 24) return `${diffHours}h ago`;
-  
+
   const diffDays = Math.floor(diffHours / 24);
   if (diffDays < 7) return `${diffDays}d ago`;
-  
+
   return date.toLocaleDateString();
 };
 
@@ -102,7 +102,7 @@ const DownloadItem: React.FC<DownloadItemProps> = ({
   onShowFiles,
 }) => {
   const [showRemoveConfirm, setShowRemoveConfirm] = useState(false);
-  
+
   const currentStats = stats || {
     progress: download.progress,
     downloadedBytes: download.downloadedBytes,
@@ -127,7 +127,7 @@ const DownloadItem: React.FC<DownloadItemProps> = ({
 
   if (viewMode === 'compact') {
     return (
-      <div 
+      <div
         className={`download-item download-item-compact ${isSelected ? 'selected' : ''}`}
         onContextMenu={(e) => onContextMenu?.(e, download.id)}
       >
@@ -168,8 +168,8 @@ const DownloadItem: React.FC<DownloadItemProps> = ({
               )}
             </div>
           </div>
-          <ProgressBar 
-            value={progress} 
+          <ProgressBar
+            value={progress}
             variant={getProgressVariant()}
             className="download-compact-progress"
           />
@@ -177,60 +177,60 @@ const DownloadItem: React.FC<DownloadItemProps> = ({
 
         <div className="download-item-actions">
           {canPause(status) && (
-            <Button 
-              variant="ghost" 
-              size="sm" 
-              iconOnly 
+            <Button
+              variant="ghost"
+              size="sm"
+              iconOnly
               icon={<Icon name="pause" size={14} />}
               onClick={() => onPause(download.id)}
               title="Pause"
             />
           )}
-          
+
           {canResume(status) && (
-            <Button 
-              variant="ghost" 
-              size="sm" 
-              iconOnly 
+            <Button
+              variant="ghost"
+              size="sm"
+              iconOnly
               icon={<Icon name="play" size={14} />}
               onClick={() => onResume(download.id)}
               title="Resume"
             />
           )}
-          
+
           {status === 'error' && (
-            <Button 
-              variant="ghost" 
-              size="sm" 
-              iconOnly 
+            <Button
+              variant="ghost"
+              size="sm"
+              iconOnly
               icon={<Icon name="refresh" size={14} />}
               onClick={() => onRetry(download.id)}
               title="Retry"
             />
           )}
 
-          <Button 
-            variant="ghost" 
-            size="sm" 
-            iconOnly 
+          <Button
+            variant="ghost"
+            size="sm"
+            iconOnly
             icon={<Icon name="list" size={14} />}
             onClick={() => onShowFiles(download.id)}
             title="Files"
           />
-          
+
           {!showRemoveConfirm ? (
-            <Button 
-              variant="ghost" 
-              size="sm" 
-              iconOnly 
+            <Button
+              variant="ghost"
+              size="sm"
+              iconOnly
               icon={<Icon name="trash" size={14} />}
               onClick={() => setShowRemoveConfirm(true)}
               title="Remove"
             />
           ) : (
             <div className="remove-confirm">
-              <Button 
-                variant="danger" 
+              <Button
+                variant="danger"
                 size="sm"
                 onClick={() => {
                   onRemove(download.id, true);
@@ -239,7 +239,7 @@ const DownloadItem: React.FC<DownloadItemProps> = ({
               >
                 + Files
               </Button>
-              <Button 
+              <Button
                 size="sm"
                 onClick={() => {
                   onRemove(download.id, false);
@@ -248,10 +248,10 @@ const DownloadItem: React.FC<DownloadItemProps> = ({
               >
                 Keep
               </Button>
-              <Button 
-                variant="ghost" 
-                size="sm" 
-                iconOnly 
+              <Button
+                variant="ghost"
+                size="sm"
+                iconOnly
                 icon={<Icon name="x" size={14} />}
                 onClick={() => setShowRemoveConfirm(false)}
               />
@@ -264,7 +264,7 @@ const DownloadItem: React.FC<DownloadItemProps> = ({
 
   // Detailed view
   return (
-    <div 
+    <div
       className={`download-item download-item-detailed ${isSelected ? 'selected' : ''}`}
       onContextMenu={(e) => onContextMenu?.(e, download.id)}
     >
@@ -284,42 +284,42 @@ const DownloadItem: React.FC<DownloadItemProps> = ({
         </div>
         <div className="download-item-actions">
           {canPause(status) && (
-            <Button 
-              variant="ghost" 
-              size="sm" 
+            <Button
+              variant="ghost"
+              size="sm"
               icon={<Icon name="pause" size={16} />}
               onClick={() => onPause(download.id)}
             >
               Pause
             </Button>
           )}
-          
+
           {canResume(status) && (
-            <Button 
-              variant="ghost" 
-              size="sm" 
+            <Button
+              variant="ghost"
+              size="sm"
               icon={<Icon name="play" size={16} />}
               onClick={() => onResume(download.id)}
             >
               Resume
             </Button>
           )}
-          
+
           {status === 'seeding' && (
-            <Button 
-              variant="ghost" 
-              size="sm" 
+            <Button
+              variant="ghost"
+              size="sm"
               icon={<Icon name="stop" size={16} />}
               onClick={() => onStopSeeding(download.id)}
             >
               Stop Seeding
             </Button>
           )}
-          
+
           {status === 'error' && (
-            <Button 
-              variant="ghost" 
-              size="sm" 
+            <Button
+              variant="ghost"
+              size="sm"
               icon={<Icon name="refresh" size={16} />}
               onClick={() => onRetry(download.id)}
             >
@@ -327,30 +327,30 @@ const DownloadItem: React.FC<DownloadItemProps> = ({
             </Button>
           )}
 
-          <Button 
-            variant="ghost" 
-            size="sm" 
+          <Button
+            variant="ghost"
+            size="sm"
             icon={<Icon name="list" size={16} />}
             onClick={() => onShowFiles(download.id)}
           >
             Files
           </Button>
-          
+
           {(status === 'completed' || status === 'seeding') && (
-            <Button 
-              variant="ghost" 
-              size="sm" 
+            <Button
+              variant="ghost"
+              size="sm"
               icon={<Icon name="folder" size={16} />}
               onClick={() => onOpenFolder(download.savePath)}
             >
               Open Folder
             </Button>
           )}
-          
+
           {!showRemoveConfirm ? (
-            <Button 
-              variant="ghost" 
-              size="sm" 
+            <Button
+              variant="ghost"
+              size="sm"
               icon={<Icon name="trash" size={16} />}
               onClick={() => setShowRemoveConfirm(true)}
             >
@@ -358,8 +358,8 @@ const DownloadItem: React.FC<DownloadItemProps> = ({
             </Button>
           ) : (
             <div className="remove-confirm">
-              <Button 
-                variant="danger" 
+              <Button
+                variant="danger"
                 size="sm"
                 onClick={() => {
                   onRemove(download.id, true);
@@ -368,7 +368,7 @@ const DownloadItem: React.FC<DownloadItemProps> = ({
               >
                 Delete Files
               </Button>
-              <Button 
+              <Button
                 size="sm"
                 onClick={() => {
                   onRemove(download.id, false);
@@ -377,10 +377,10 @@ const DownloadItem: React.FC<DownloadItemProps> = ({
               >
                 Keep Files
               </Button>
-              <Button 
-                variant="ghost" 
-                size="sm" 
-                iconOnly 
+              <Button
+                variant="ghost"
+                size="sm"
+                iconOnly
                 icon={<Icon name="x" size={16} />}
                 onClick={() => setShowRemoveConfirm(false)}
               />
@@ -390,8 +390,8 @@ const DownloadItem: React.FC<DownloadItemProps> = ({
       </div>
 
       <div className="download-detailed-progress">
-        <ProgressBar 
-          value={progress} 
+        <ProgressBar
+          value={progress}
           variant={getProgressVariant()}
         />
         <span className="progress-text-large">{(progress * 100).toFixed(1)}%</span>
@@ -427,7 +427,7 @@ const DownloadItem: React.FC<DownloadItemProps> = ({
             <div className="stat-content">
               <span className="stat-label">Ratio</span>
               <span className="stat-value">
-                {currentStats.downloadedBytes > 0 
+                {currentStats.downloadedBytes > 0
                   ? (currentStats.uploadedBytes / currentStats.downloadedBytes).toFixed(2)
                   : '0.00'}
               </span>
@@ -439,7 +439,7 @@ const DownloadItem: React.FC<DownloadItemProps> = ({
             <div className="stat-content">
               <span className="stat-label">Size</span>
               <span className="stat-value">
-                {currentStats.progress > 0 
+                {currentStats.progress > 0
                   ? formatBytes(Math.round(currentStats.downloadedBytes / currentStats.progress))
                   : '--'}
               </span>
@@ -508,7 +508,7 @@ const DownloadsPage: React.FC = () => {
   const [downloads, setDownloads] = useState<Download[]>([]);
   const [stats, setStats] = useState<Map<string, DownloadStats>>(new Map());
   const [loading, setLoading] = useState(true);
-  
+
   // Toast notifications
   const [toasts, setToasts] = useState<Array<{
     id: string;
@@ -516,23 +516,23 @@ const DownloadsPage: React.FC = () => {
     variant?: 'success' | 'error' | 'warning' | 'info';
     duration?: number;
   }>>([]);
-  
+
   // UI State
   const [viewMode, setViewMode] = useState<ViewMode>('detailed');
   const [filterMode, setFilterMode] = useState<FilterMode>('all');
   const [sortMode, setSortMode] = useState<SortMode>('added');
   const [searchQuery, setSearchQuery] = useState('');
-  
+
   // Selection state
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
-  
+
   // Context menu state
   const [contextMenu, setContextMenu] = useState<{
     x: number;
     y: number;
     downloadId: string;
   } | null>(null);
-  
+
   // Other state
   const [isDragging, setIsDragging] = useState(false);
   const [dragCounter, setDragCounter] = useState(0);
@@ -540,7 +540,12 @@ const DownloadsPage: React.FC = () => {
   const [previewId, setPreviewId] = useState<string | null>(null);
   const [showFilterMenu, setShowFilterMenu] = useState(false);
   const [showSortMenu, setShowSortMenu] = useState(false);
-  
+  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
+  const [showExportMenu, setShowExportMenu] = useState(false);
+
+  // Refs
+  const searchInputRef = useRef<HTMLInputElement>(null);
+
   // File selector state
   const [showFileSelector, setShowFileSelector] = useState(false);
   const [pendingTorrent, setPendingTorrent] = useState<{
@@ -613,7 +618,7 @@ const DownloadsPage: React.FC = () => {
         statsMap.set(stat.id, stat);
       }
       setStats(statsMap);
-      
+
       // Update download statuses from stats
       setDownloads((prev) =>
         prev.map((d) => {
@@ -647,6 +652,137 @@ const DownloadsPage: React.FC = () => {
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
+
+  // Keyboard shortcuts
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      const target = e.target as HTMLElement;
+      const isInInput = target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement;
+
+      // Ctrl+A - Select all downloads
+      if (e.ctrlKey && e.key === 'a' && !isInInput) {
+        e.preventDefault();
+        setSelectedIds(new Set(downloads.map(d => d.id)));
+      }
+
+      // Delete - Remove selected downloads
+      if (e.key === 'Delete' && selectedIds.size > 0 && !isInInput) {
+        e.preventDefault();
+        if (confirm(`Remove ${selectedIds.size} download(s)?`)) {
+          selectedIds.forEach(async (id) => {
+            try {
+              await window.api.removeDownload(id, false);
+              setDownloads((prev) => prev.filter((d) => d.id !== id));
+            } catch (error) {
+              console.error('Failed to remove:', error);
+            }
+          });
+          setSelectedIds(new Set());
+          addToast(`Removed ${selectedIds.size} download(s)`, 'success');
+        }
+      }
+
+      // Space - Toggle pause/resume for selected
+      if (e.key === ' ' && selectedIds.size > 0 && !isInInput) {
+        e.preventDefault();
+        selectedIds.forEach(async (id) => {
+          const download = downloads.find(d => d.id === id);
+          if (download) {
+            try {
+              if (canPause(download.status)) {
+                await window.api.pauseDownload(id);
+              } else if (canResume(download.status)) {
+                await window.api.resumeDownload(id);
+              }
+            } catch (error) {
+              console.error('Failed to toggle pause/resume:', error);
+            }
+          }
+        });
+        loadDownloads();
+      }
+
+      // Ctrl+F - Focus search box
+      if (e.ctrlKey && e.key === 'f') {
+        e.preventDefault();
+        searchInputRef.current?.focus();
+      }
+
+      // Ctrl+P - Toggle view mode
+      if (e.ctrlKey && e.key === 'p') {
+        e.preventDefault();
+        setViewMode(prev => prev === 'compact' ? 'detailed' : 'compact');
+      }
+
+      // Escape - Clear selection
+      if (e.key === 'Escape') {
+        setSelectedIds(new Set());
+        setShowFilterMenu(false);
+        setShowSortMenu(false);
+        setShowExportMenu(false);
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [selectedIds, downloads, addToast]);
+
+  // Export downloads list
+  const handleExport = useCallback((format: 'json' | 'csv') => {
+    const data = downloads.map(d => ({
+      name: d.name,
+      status: d.status,
+      progress: Math.round(d.progress * 100) + '%',
+      size: formatBytes(d.totalSize),
+      downloadedBytes: formatBytes(d.downloadedBytes),
+      uploadedBytes: formatBytes(d.uploadedBytes),
+      addedAt: formatDate(d.createdAt),
+      savePath: d.savePath,
+    }));
+
+    let content: string;
+    let filename: string;
+    let mimeType: string;
+
+    if (format === 'json') {
+      content = JSON.stringify({
+        exported_at: new Date().toISOString(),
+        total: data.length,
+        downloads: data
+      }, null, 2);
+      filename = `downloads_${new Date().toISOString().split('T')[0]}.json`;
+      mimeType = 'application/json';
+    } else {
+      const headers = ['Name', 'Status', 'Progress', 'Size', 'Downloaded', 'Uploaded', 'Added At', 'Save Path'];
+      const rows = data.map(d => [d.name, d.status, d.progress, d.size, d.downloadedBytes, d.uploadedBytes, d.addedAt, d.savePath]);
+      content = [headers.join(','), ...rows.map(r => r.map(c => `"${String(c).replace(/"/g, '""')}"`).join(','))].join('\n');
+      filename = `downloads_${new Date().toISOString().split('T')[0]}.csv`;
+      mimeType = 'text/csv';
+    }
+
+    const blob = new Blob([content], { type: mimeType });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+
+    addToast(`Exported ${data.length} downloads as ${format.toUpperCase()}`, 'success');
+    setShowExportMenu(false);
+  }, [downloads, addToast]);
+
+  // Header sort handler
+  const handleHeaderSort = useCallback((mode: SortMode) => {
+    if (sortMode === mode) {
+      setSortDirection(prev => prev === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortMode(mode);
+      setSortDirection('desc');
+    }
+  }, [sortMode]);
 
   const loadDownloads = async () => {
     try {
@@ -688,7 +824,7 @@ const DownloadsPage: React.FC = () => {
       const arrayBuffer = await file.arrayBuffer();
       const uint8Array = new Uint8Array(arrayBuffer);
       const base64 = btoa(String.fromCharCode(...uint8Array));
-      
+
       // For now, show file preview - actual upload will need API extension
       setSelectedFile(file);
       addToast('File ready to upload. Click "Add Selected Torrent" to proceed.', 'success');
@@ -702,19 +838,19 @@ const DownloadsPage: React.FC = () => {
 
   const handleFileSelectionConfirm = async (selectedIndices: number[]) => {
     if (!pendingTorrent) return;
-    
+
     try {
       const download = await window.api.addDownload({
         sourceType: pendingTorrent.path ? 'torrent_file' : 'magnet',
         sourceUri: pendingTorrent.path || pendingTorrent.magnetUri!,
         selectedFiles: selectedIndices,
       });
-      
+
       setDownloads((prev) => [download, ...prev]);
       setShowFileSelector(false);
       setPendingTorrent(null);
       setSelectedFile(null);
-      
+
       addToast(
         `Download added with ${selectedIndices.length} file${selectedIndices.length > 1 ? 's' : ''}`,
         'success'
@@ -726,7 +862,7 @@ const DownloadsPage: React.FC = () => {
       );
     }
   };
-  
+
   const handleFileSelectorCancel = () => {
     setShowFileSelector(false);
     setPendingTorrent(null);
@@ -845,35 +981,36 @@ const DownloadsPage: React.FC = () => {
         return false;
       }
     }
-    
+
     // Filter by search query
     if (searchQuery) {
       const query = searchQuery.toLowerCase();
       return download.name.toLowerCase().includes(query);
     }
-    
+
     return true;
   });
 
-  // Sort downloads based on sort mode
+  // Sort downloads based on sort mode and direction
   const sortedDownloads = [...filteredDownloads].sort((a, b) => {
     const statA = stats.get(a.id);
     const statB = stats.get(b.id);
-    
+    const direction = sortDirection === 'asc' ? 1 : -1;
+
     switch (sortMode) {
       case 'name':
-        return a.name.localeCompare(b.name);
+        return a.name.localeCompare(b.name) * direction;
       case 'progress':
         const progressA = statA?.progress ?? a.progress;
         const progressB = statB?.progress ?? b.progress;
-        return progressB - progressA;
+        return (progressB - progressA) * direction;
       case 'speed':
         const speedA = statA?.downSpeedBps ?? 0;
         const speedB = statB?.downSpeedBps ?? 0;
-        return speedB - speedA;
+        return (speedB - speedA) * direction;
       case 'added':
       default:
-        return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+        return (new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()) * direction;
     }
   });
 
@@ -900,7 +1037,7 @@ const DownloadsPage: React.FC = () => {
   }
 
   return (
-    <div 
+    <div
       className="page-container"
       onDragEnter={handleDragEnter}
       onDragOver={handleDragOver}
@@ -928,7 +1065,7 @@ const DownloadsPage: React.FC = () => {
               title="Detailed view"
             />
           </div>
-          <Button 
+          <Button
             variant="ghost"
             size="sm"
             iconOnly
@@ -936,7 +1073,41 @@ const DownloadsPage: React.FC = () => {
             onClick={loadDownloads}
             title="Refresh"
           />
-          <Button 
+          {/* Export Dropdown */}
+          <div className="dropdown-wrapper">
+            <Button
+              variant="ghost"
+              size="sm"
+              icon={<Icon name="download" size={16} />}
+              onClick={() => {
+                setShowExportMenu(!showExportMenu);
+                setShowFilterMenu(false);
+                setShowSortMenu(false);
+              }}
+              title="Export downloads list"
+            >
+              Export
+            </Button>
+            {showExportMenu && (
+              <div className="dropdown-menu export-dropdown">
+                <button
+                  className="dropdown-item"
+                  onClick={() => handleExport('json')}
+                >
+                  <Icon name="file" size={16} />
+                  <span>Export as JSON</span>
+                </button>
+                <button
+                  className="dropdown-item"
+                  onClick={() => handleExport('csv')}
+                >
+                  <Icon name="grid" size={16} />
+                  <span>Export as CSV</span>
+                </button>
+              </div>
+            )}
+          </div>
+          <Button
             variant="primary"
             size="sm"
             icon={<Icon name="plus" size={16} />}
@@ -969,7 +1140,7 @@ const DownloadsPage: React.FC = () => {
                 <span className="global-stat-label">Done</span>
               </div>
             </div>
-            
+
             <div className="global-stats-group">
               <div className="global-stat-item">
                 <Icon name="arrow-down" size={14} />
@@ -983,163 +1154,151 @@ const DownloadsPage: React.FC = () => {
           </div>
         )}
 
-        {/* Compact Filter and Sort Controls */}
+        {/* Modern Search, Filter & Sort Controls */}
         {downloads.length > 0 && (
-          <div className="filter-sort-controls-compact">
-            {/* Search Box */}
-            <div className="search-box">
-              <Icon name="search" size={16} />
-              <input
-                type="text"
-                placeholder="Search downloads..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="search-input"
-              />
-              {searchQuery && (
+          <div className="modern-controls">
+            {/* Search Bar with Results Count */}
+            <div className="modern-search-wrapper">
+              <div className="modern-search-box">
+                <Icon name="search" size={18} />
+                <input
+                  ref={searchInputRef}
+                  type="text"
+                  placeholder="Search downloads... (Ctrl+F)"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="modern-search-input"
+                />
+                {searchQuery && (
+                  <button
+                    className="modern-search-clear"
+                    onClick={() => setSearchQuery('')}
+                    title="Clear search"
+                  >
+                    <Icon name="x" size={16} />
+                  </button>
+                )}
+              </div>
+
+              {/* Results Count */}
+              {(searchQuery || filterMode !== 'all') && (
+                <div className="results-count">
+                  <Icon name="info" size={14} />
+                  <span>{sortedDownloads.length} result{sortedDownloads.length !== 1 ? 's' : ''}</span>
+                </div>
+              )}
+            </div>
+
+            {/* Filter Chips */}
+            <div className="filter-chips-section">
+              <span className="section-label">
+                <Icon name="filter" size={14} />
+                Filters:
+              </span>
+              <div className="filter-chips">
                 <button
-                  className="search-clear"
-                  onClick={() => setSearchQuery('')}
-                  title="Clear search"
+                  className={`filter-chip ${filterMode === 'all' ? 'active' : ''}`}
+                  onClick={() => setFilterMode('all')}
+                >
+                  <Icon name="list" size={14} />
+                  <span>All</span>
+                  <span className="chip-badge">{downloads.length}</span>
+                </button>
+                <button
+                  className={`filter-chip ${filterMode === 'downloading' ? 'active downloading' : ''}`}
+                  onClick={() => setFilterMode('downloading')}
+                >
+                  <Icon name="download" size={14} />
+                  <span>Downloading</span>
+                  <span className="chip-badge">{downloads.filter(d => ['downloading', 'queued'].includes(d.status)).length}</span>
+                </button>
+                <button
+                  className={`filter-chip ${filterMode === 'completed' ? 'active completed' : ''}`}
+                  onClick={() => setFilterMode('completed')}
+                >
+                  <Icon name="check-circle" size={14} />
+                  <span>Completed</span>
+                  <span className="chip-badge">{downloads.filter(d => ['completed', 'seeding'].includes(d.status)).length}</span>
+                </button>
+                <button
+                  className={`filter-chip ${filterMode === 'paused' ? 'active paused' : ''}`}
+                  onClick={() => setFilterMode('paused')}
+                >
+                  <Icon name="pause" size={14} />
+                  <span>Paused</span>
+                  <span className="chip-badge">{downloads.filter(d => d.status === 'paused').length}</span>
+                </button>
+                <button
+                  className={`filter-chip ${filterMode === 'error' ? 'active error' : ''}`}
+                  onClick={() => setFilterMode('error')}
+                >
+                  <Icon name="alert-triangle" size={14} />
+                  <span>Error</span>
+                  <span className="chip-badge">{downloads.filter(d => d.status === 'error').length}</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Sort Options */}
+            <div className="sort-options-section">
+              <span className="section-label">
+                <Icon name="arrow-down" size={14} />
+                Sort by:
+              </span>
+              <div className="sort-chips">
+                <button
+                  className={`sort-chip ${sortMode === 'added' ? 'active' : ''}`}
+                  onClick={() => handleHeaderSort('added')}
+                >
+                  <span>Date Added</span>
+                  {sortMode === 'added' && (
+                    <Icon name={sortDirection === 'asc' ? 'arrow-up' : 'arrow-down'} size={14} />
+                  )}
+                </button>
+                <button
+                  className={`sort-chip ${sortMode === 'name' ? 'active' : ''}`}
+                  onClick={() => handleHeaderSort('name')}
+                >
+                  <span>Name</span>
+                  {sortMode === 'name' && (
+                    <Icon name={sortDirection === 'asc' ? 'arrow-up' : 'arrow-down'} size={14} />
+                  )}
+                </button>
+                <button
+                  className={`sort-chip ${sortMode === 'progress' ? 'active' : ''}`}
+                  onClick={() => handleHeaderSort('progress')}
+                >
+                  <span>Progress</span>
+                  {sortMode === 'progress' && (
+                    <Icon name={sortDirection === 'asc' ? 'arrow-up' : 'arrow-down'} size={14} />
+                  )}
+                </button>
+                <button
+                  className={`sort-chip ${sortMode === 'speed' ? 'active' : ''}`}
+                  onClick={() => handleHeaderSort('speed')}
+                >
+                  <span>Speed</span>
+                  {sortMode === 'speed' && (
+                    <Icon name={sortDirection === 'asc' ? 'arrow-up' : 'arrow-down'} size={14} />
+                  )}
+                </button>
+              </div>
+
+              {/* Clear All Filters Button */}
+              {(filterMode !== 'all' || searchQuery || sortMode !== 'added' || sortDirection !== 'desc') && (
+                <button
+                  className="clear-filters-btn"
+                  onClick={() => {
+                    setFilterMode('all');
+                    setSearchQuery('');
+                    setSortMode('added');
+                    setSortDirection('desc');
+                  }}
+                  title="Reset all filters"
                 >
                   <Icon name="x" size={14} />
+                  <span>Clear All</span>
                 </button>
-              )}
-            </div>
-
-            {/* Filter Dropdown */}
-            <div className="dropdown-wrapper">
-              <Button
-                variant="secondary"
-                size="sm"
-                icon={<Icon name="filter" size={16} />}
-                onClick={() => {
-                  setShowFilterMenu(!showFilterMenu);
-                  setShowSortMenu(false);
-                }}
-              >
-                {filterMode === 'all' ? 'All' : 
-                 filterMode === 'downloading' ? 'Downloading' :
-                 filterMode === 'completed' ? 'Completed' :
-                 filterMode === 'paused' ? 'Paused' : 'Error'}
-                <Icon name={showFilterMenu ? "chevron-up" : "chevron-down"} size={14} />
-              </Button>
-              {showFilterMenu && (
-                <div className="dropdown-menu filter-dropdown">
-                  <button
-                    className={`dropdown-item ${filterMode === 'all' ? 'active' : ''}`}
-                    onClick={() => {
-                      setFilterMode('all');
-                      setShowFilterMenu(false);
-                    }}
-                  >
-                    <Icon name="list" size={16} />
-                    <span>All</span>
-                    <span className="badge">{downloads.length}</span>
-                  </button>
-                  <button
-                    className={`dropdown-item ${filterMode === 'downloading' ? 'active' : ''}`}
-                    onClick={() => {
-                      setFilterMode('downloading');
-                      setShowFilterMenu(false);
-                    }}
-                  >
-                    <Icon name="download" size={16} />
-                    <span>Downloading</span>
-                    <span className="badge">{downloads.filter(d => ['downloading', 'queued'].includes(d.status)).length}</span>
-                  </button>
-                  <button
-                    className={`dropdown-item ${filterMode === 'completed' ? 'active' : ''}`}
-                    onClick={() => {
-                      setFilterMode('completed');
-                      setShowFilterMenu(false);
-                    }}
-                  >
-                    <Icon name="check-circle" size={16} />
-                    <span>Completed</span>
-                    <span className="badge">{downloads.filter(d => ['completed', 'seeding'].includes(d.status)).length}</span>
-                  </button>
-                  <button
-                    className={`dropdown-item ${filterMode === 'paused' ? 'active' : ''}`}
-                    onClick={() => {
-                      setFilterMode('paused');
-                      setShowFilterMenu(false);
-                    }}
-                  >
-                    <Icon name="pause" size={16} />
-                    <span>Paused</span>
-                    <span className="badge">{downloads.filter(d => d.status === 'paused').length}</span>
-                  </button>
-                  <button
-                    className={`dropdown-item ${filterMode === 'error' ? 'active' : ''}`}
-                    onClick={() => {
-                      setFilterMode('error');
-                      setShowFilterMenu(false);
-                    }}
-                  >
-                    <Icon name="alert-triangle" size={16} />
-                    <span>Error</span>
-                    <span className="badge">{downloads.filter(d => d.status === 'error').length}</span>
-                  </button>
-                </div>
-              )}
-            </div>
-
-            {/* Sort Dropdown */}
-            <div className="dropdown-wrapper">
-              <Button
-                variant="secondary"
-                size="sm"
-                icon={<Icon name="arrow-down" size={16} />}
-                onClick={() => {
-                  setShowSortMenu(!showSortMenu);
-                  setShowFilterMenu(false);
-                }}
-              >
-                {sortMode === 'added' ? 'Added' : 
-                 sortMode === 'name' ? 'Name' :
-                 sortMode === 'progress' ? 'Progress' : 'Speed'}
-                <Icon name={showSortMenu ? "chevron-up" : "chevron-down"} size={14} />
-              </Button>
-              {showSortMenu && (
-                <div className="dropdown-menu sort-dropdown">
-                  <button
-                    className={`dropdown-item ${sortMode === 'added' ? 'active' : ''}`}
-                    onClick={() => {
-                      setSortMode('added');
-                      setShowSortMenu(false);
-                    }}
-                  >
-                    <span>Date Added</span>
-                  </button>
-                  <button
-                    className={`dropdown-item ${sortMode === 'name' ? 'active' : ''}`}
-                    onClick={() => {
-                      setSortMode('name');
-                      setShowSortMenu(false);
-                    }}
-                  >
-                    <span>Name</span>
-                  </button>
-                  <button
-                    className={`dropdown-item ${sortMode === 'progress' ? 'active' : ''}`}
-                    onClick={() => {
-                      setSortMode('progress');
-                      setShowSortMenu(false);
-                    }}
-                  >
-                    <span>Progress</span>
-                  </button>
-                  <button
-                    className={`dropdown-item ${sortMode === 'speed' ? 'active' : ''}`}
-                    onClick={() => {
-                      setSortMode('speed');
-                      setShowSortMenu(false);
-                    }}
-                  >
-                    <span>Speed</span>
-                  </button>
-                </div>
               )}
             </div>
           </div>
@@ -1258,35 +1417,78 @@ const DownloadsPage: React.FC = () => {
             description="Try selecting a different filter or adding more downloads."
           />
         ) : (
-          <div className={`downloads-list downloads-list-${viewMode}`}>
-            {sortedDownloads.map((download) => (
-              <DownloadItem
-                key={download.id}
-                download={download}
-                stats={stats.get(download.id)}
-                viewMode={viewMode}
-                isSelected={selectedIds.has(download.id)}
-                onSelect={handleSelectItem}
-                onContextMenu={handleContextMenu}
-                onPause={handlePause}
-                onResume={handleResume}
-                onRemove={handleRemove}
-                onStopSeeding={handleStopSeeding}
-                onRetry={handleRetry}
-                onOpenFolder={handleOpenFolder}
-                onShowFiles={(id) => setPreviewId(id)}
-              />
-            ))}
-          </div>
+          <>
+            {/* Sortable Column Headers - Detailed View Only */}
+            {viewMode === 'detailed' && (
+              <div className="downloads-header">
+                <button
+                  className={`sortable-header ${sortMode === 'name' ? 'active' : ''}`}
+                  onClick={() => handleHeaderSort('name')}
+                >
+                  <span>Name</span>
+                  {sortMode === 'name' && (
+                    <Icon name={sortDirection === 'asc' ? 'arrow-up' : 'arrow-down'} size={14} />
+                  )}
+                </button>
+                <button
+                  className={`sortable-header ${sortMode === 'progress' ? 'active' : ''}`}
+                  onClick={() => handleHeaderSort('progress')}
+                >
+                  <span>Progress</span>
+                  {sortMode === 'progress' && (
+                    <Icon name={sortDirection === 'asc' ? 'arrow-up' : 'arrow-down'} size={14} />
+                  )}
+                </button>
+                <button
+                  className={`sortable-header ${sortMode === 'speed' ? 'active' : ''}`}
+                  onClick={() => handleHeaderSort('speed')}
+                >
+                  <span>Speed</span>
+                  {sortMode === 'speed' && (
+                    <Icon name={sortDirection === 'asc' ? 'arrow-up' : 'arrow-down'} size={14} />
+                  )}
+                </button>
+                <button
+                  className={`sortable-header ${sortMode === 'added' ? 'active' : ''}`}
+                  onClick={() => handleHeaderSort('added')}
+                >
+                  <span>Added</span>
+                  {sortMode === 'added' && (
+                    <Icon name={sortDirection === 'asc' ? 'arrow-up' : 'arrow-down'} size={14} />
+                  )}
+                </button>
+              </div>
+            )}
+            <div className={`downloads-list downloads-list-${viewMode}`}>
+              {sortedDownloads.map((download) => (
+                <DownloadItem
+                  key={download.id}
+                  download={download}
+                  stats={stats.get(download.id)}
+                  viewMode={viewMode}
+                  isSelected={selectedIds.has(download.id)}
+                  onSelect={handleSelectItem}
+                  onContextMenu={handleContextMenu}
+                  onPause={handlePause}
+                  onResume={handleResume}
+                  onRemove={handleRemove}
+                  onStopSeeding={handleStopSeeding}
+                  onRetry={handleRetry}
+                  onOpenFolder={handleOpenFolder}
+                  onShowFiles={(id) => setPreviewId(id)}
+                />
+              ))}
+            </div>
+          </>
         )}
 
         {previewId && (
-          <FilePreview 
-            downloadId={previewId} 
-            onClose={() => setPreviewId(null)} 
+          <FilePreview
+            downloadId={previewId}
+            onClose={() => setPreviewId(null)}
           />
         )}
-        
+
         {/* Torrent File Selector */}
         {showFileSelector && pendingTorrent && (
           <TorrentFileSelector
