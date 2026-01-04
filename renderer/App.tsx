@@ -10,11 +10,8 @@ import CreateTorrentPage from './pages/CreateTorrentPage';
 import DownloadsPage from './pages/DownloadsPage';
 import SettingsPage from './pages/SettingsPage';
 
-// Extended page type to include create-torrent
-type ExtendedPageId = PageId | 'create-torrent';
-
 const App: React.FC = () => {
-  const [currentPage, setCurrentPage] = useState<ExtendedPageId>('downloads');
+  const [currentPage, setCurrentPage] = useState<PageId>('downloads');
   const [stats, setStats] = useState<DownloadStats[]>([]);
   const [downloads, setDownloads] = useState<Download[]>([]);
   const [filterMode, setFilterMode] = useState<FilterMode>('all');
@@ -107,19 +104,15 @@ const App: React.FC = () => {
     }
   };
 
-  // Determine sidebar page (don't highlight create-torrent in nav)
-  const sidebarPage: PageId = currentPage === 'create-torrent' ? 'downloads' : currentPage;
-
   return (
     <div className="app-container">
       <Sidebar
-        currentPage={sidebarPage}
-        onNavigate={(page) => setCurrentPage(page)}
+        currentPage={currentPage}
+        onNavigate={setCurrentPage}
         filterMode={filterMode}
         onFilterChange={setFilterMode}
         downloadCounts={downloadCounts}
         activeDownloads={activeDownloads}
-        onCreateTorrent={() => setCurrentPage('create-torrent')}
       />
 
       <main className="main-content">

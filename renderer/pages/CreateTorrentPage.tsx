@@ -5,7 +5,7 @@
  */
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { Button, Icon, Input, ProgressBar, ToastContainer } from '../components';
+import { Button, Icon, Input, ProgressBar, ToastContainer, FileTreeSelector, FileNode, QRCode, TrackerTemplates, MetadataPreview, BatchCreate } from '../components';
 import { CreateTorrentOptions, CreateTorrentProgress, CreateTorrentResult } from '../../shared/types';
 import './CreateTorrentPage.css';
 
@@ -102,6 +102,15 @@ export const CreateTorrentPage: React.FC<CreateTorrentPageProps> = ({ onNavigate
   
   // File list for preview
   const [fileList, setFileList] = useState<Array<{name: string, size: number, path: string}>>([]);
+  
+  // New features state
+  const [fileTree, setFileTree] = useState<FileNode[]>([]);
+  const [excludedPaths, setExcludedPaths] = useState<Set<string>>(new Set());
+  const [showFileTree, setShowFileTree] = useState(false);
+  const [showTrackerTemplates, setShowTrackerTemplates] = useState(false);
+  const [showMetadataPreview, setShowMetadataPreview] = useState(false);
+  const [showBatchCreate, setShowBatchCreate] = useState(false);
+  const [showQRCode, setShowQRCode] = useState(false);
 
   // Toast helper
   const addToast = useCallback((message: string, variant: 'success' | 'error' | 'warning' | 'info' = 'info', duration = 5000) => {
@@ -150,6 +159,16 @@ export const CreateTorrentPage: React.FC<CreateTorrentPageProps> = ({ onNavigate
         setSourceSize(totalSize);
         setSourceFileCount(totalFiles);
         setFileList(files);
+        
+        // Build simple file tree (for display purposes)
+        const tree: FileNode[] = files.map(file => ({
+          path: file.path,
+          name: file.name,
+          size: file.size,
+          isDirectory: sourceMode === 'folder',
+          children: [] // In a real implementation, this would be populated with actual file structure
+        }));
+        setFileTree(tree);
       } catch (err) {
         console.error('Failed to get path info:', err);
       }
@@ -378,7 +397,97 @@ export const CreateTorrentPage: React.FC<CreateTorrentPageProps> = ({ onNavigate
     setResult(null);
     setError(null);
     setActiveTab('basic');
+    setExcludedPaths(new Set());
+    setFileTree([]);
+    setShowFileTree(false);
   }, []);
+  
+  // File tree handlers
+  const handleToggleFile = useCallback((path: string, isDirectory: boolean) => {
+    setExcludedPaths(prev => {
+      const next = new Set(prev);
+      if (next.has(path)) {
+        next.delete(path);
+        // If it's a directory, remove all children too
+        if (isDirectory) {
+          const removeChildren = (nodes: FileNode[]) => {
+            nodes.forEach(node => {
+              next.delete(node.path);
+              if (node.children) removeChildren(node.children);
+            });
+          };
+          const findNode = (nodes: FileNode[], targetPath: string): FileNode | null => {
+            for (const node of nodes) {
+              if (node.path === targetPath) return node;
+              if (node.children) {
+                const found = findNode(node.children, targetPath);
+                if (found) return found;
+              }
+            }
+            return null;
+          };
+          const node = findNode(fileTree, path);
+          if (node?.children) removeChildren(node.children);
+        }
+      } else {
+        next.add(path);
+        // If it's a directory, exclude all children too
+        if (isDirectory) {
+          const excludeChildren = (nodes: FileNode[]) => {
+            nodes.forEach(node => {
+              next.add(node.path);
+              if (node.children) excludeChildren(node.children);
+            });
+          };
+          const findNode = (nodes: FileNode[], targetPath: string): FileNode | null => {
+            for (const node of nodes) {
+              if (node.path === targetPath) return node;
+              if (node.children) {
+                const found = findNode(node.children, targetPath);
+                if (found) return found;
+              }
+            }
+            return null;
+          };
+          const node = findNode(fileTree, path);
+          if (node?.children) excludeChildren(node.children);
+        }
+      }
+      return next;
+    });
+  }, [fileTree]);
+  
+  const handleToggleAllFiles = useCallback((included: boolean) => {
+    if (included) {
+      setExcludedPaths(new Set());
+    } else {
+      const allPaths = new Set<string>();
+      const collectPaths = (nodes: FileNode[]) => {
+        nodes.forEach(node => {
+          allPaths.add(node.path);
+          if (node.children) collectPaths(node.children);
+        });
+      };
+      collectPaths(fileTree);
+      setExcludedPaths(allPaths);
+    }
+  }, [fileTree]);
+  
+  // Tracker templates handler
+  const handleSelectTrackerTemplate = useCallback((trackerList: string[]) => {
+    setTrackers(trackerList.join('\n'));
+    addToast('Tracker template applied', 'success');
+  }, [addToast]);
+  
+  // Metadata preview handler
+  const handleShowMetadataPreview = useCallback(() => {
+    setShowMetadataPreview(true);
+  }, []);
+  
+  const handleConfirmCreate = useCallback(() => {
+    setShowMetadataPreview(false);
+    handleCreate();
+  }, [handleCreate]);
 
   // Render source selection UI
   const renderSourceSelector = () => {
@@ -459,6 +568,14 @@ export const CreateTorrentPage: React.FC<CreateTorrentPageProps> = ({ onNavigate
         </div>
         
         <div className="header-actions">
+          {stage === 'setup' && (
+            <>
+              <Button variant="ghost" onClick={() => setShowBatchCreate(true)}>
+                <Icon name="layers" size={16} />
+                Batch Create
+              </Button>
+            </>
+          )}
           {stage === 'success' && (
             <Button variant="secondary" onClick={handleCreateNew}>
               <Icon name="plus" size={16} />
@@ -502,6 +619,33 @@ export const CreateTorrentPage: React.FC<CreateTorrentPageProps> = ({ onNavigate
 
                 {/* Source Selection Area */}
                 {renderSourceSelector()}
+                
+                {/* File Tree Selector */}
+                {sourcePaths.length > 0 && fileTree.length > 0 && (
+                  <div className="file-tree-section">
+                    <div className="section-header">
+                      <h4>
+                        <Icon name="list" size={14} />
+                        Files to Include
+                      </h4>
+                      <button
+                        className="toggle-tree-btn"
+                        onClick={() => setShowFileTree(!showFileTree)}
+                      >
+                        <Icon name={showFileTree ? 'chevron-up' : 'chevron-down'} size={14} />
+                        {showFileTree ? 'Hide' : 'Show'}
+                      </button>
+                    </div>
+                    {showFileTree && (
+                      <FileTreeSelector
+                        files={fileTree}
+                        excludedPaths={excludedPaths}
+                        onToggle={handleToggleFile}
+                        onToggleAll={handleToggleAllFiles}
+                      />
+                    )}
+                  </div>
+                )}
               </div>
             </div>
 
@@ -633,6 +777,13 @@ export const CreateTorrentPage: React.FC<CreateTorrentPageProps> = ({ onNavigate
                     </div>
 
                     <div className="tracker-buttons">
+                      <button
+                        className="tracker-btn"
+                        onClick={() => setShowTrackerTemplates(true)}
+                      >
+                        <Icon name="layout-template" size={14} />
+                        Templates
+                      </button>
                       <button
                         className="tracker-btn"
                         onClick={() => {
@@ -888,6 +1039,24 @@ export const CreateTorrentPage: React.FC<CreateTorrentPageProps> = ({ onNavigate
                     {copiedMagnet ? 'Copied!' : 'Copy Link'}
                   </Button>
                 </div>
+                
+                {/* QR Code Toggle */}
+                <div className="qr-toggle">
+                  <button
+                    className="qr-toggle-btn"
+                    onClick={() => setShowQRCode(!showQRCode)}
+                  >
+                    <Icon name="qr-code" size={14} />
+                    {showQRCode ? 'Hide QR Code' : 'Show QR Code'}
+                  </button>
+                </div>
+                
+                {showQRCode && (
+                  <div className="qr-code-wrapper">
+                    <QRCode data={result.magnetUri} size={200} />
+                    <p className="qr-hint">Scan to open magnet link on mobile device</p>
+                  </div>
+                )}
               </div>
 
               <div className="success-actions">
@@ -963,6 +1132,15 @@ export const CreateTorrentPage: React.FC<CreateTorrentPageProps> = ({ onNavigate
           </div>
           <div className="footer-actions">
             <Button
+              variant="secondary"
+              size="lg"
+              onClick={handleShowMetadataPreview}
+              disabled={sourcePaths.length === 0}
+            >
+              <Icon name="eye" size={18} />
+              Preview
+            </Button>
+            <Button
               variant="primary"
               size="lg"
               onClick={handleCreate}
@@ -978,6 +1156,46 @@ export const CreateTorrentPage: React.FC<CreateTorrentPageProps> = ({ onNavigate
 
       {/* Toast Container */}
       <ToastContainer toasts={toasts} onClose={removeToast} />
+      
+      {/* Tracker Templates Modal */}
+      <TrackerTemplates
+        isOpen={showTrackerTemplates}
+        onClose={() => setShowTrackerTemplates(false)}
+        onSelect={handleSelectTrackerTemplate}
+      />
+      
+      {/* Metadata Preview Modal */}
+      {pieceInfo && (
+        <MetadataPreview
+          isOpen={showMetadataPreview}
+          onClose={() => setShowMetadataPreview(false)}
+          onConfirm={handleConfirmCreate}
+          metadata={{
+            name: name || sourcePaths[0]?.split(/[/\\]/).pop() || 'Torrent',
+            comment: comment || undefined,
+            totalSize: sourceSize,
+            fileCount: sourceFileCount,
+            pieceSize: pieceInfo.pieceLength,
+            pieceCount: pieceInfo.pieceCount,
+            trackers: trackers.split('\n').map(l => l.trim()).filter(l => l),
+            webSeeds: webSeeds ? webSeeds.split('\n').map(l => l.trim()).filter(l => l) : undefined,
+            isPrivate,
+            createdBy,
+            estimatedTorrentSize: pieceInfo.estimatedTorrentSize
+          }}
+        />
+      )}
+      
+      {/* Batch Create Modal */}
+      <BatchCreate
+        isOpen={showBatchCreate}
+        onClose={() => setShowBatchCreate(false)}
+        trackers={trackers}
+        isPrivate={isPrivate}
+        pieceLength={pieceLength}
+        startSeeding={startSeeding}
+        createdBy={createdBy}
+      />
     </div>
   );
 };

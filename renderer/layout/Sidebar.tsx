@@ -7,7 +7,7 @@
 import React, { useState } from 'react';
 import { Icon, IconName } from '../components';
 
-export type PageId = 'downloads' | 'catalog' | 'settings';
+export type PageId = 'downloads' | 'catalog' | 'settings' | 'create-torrent';
 export type FilterMode = 'all' | 'downloading' | 'completed' | 'paused' | 'error';
 
 interface NavItem {
@@ -39,7 +39,6 @@ interface SidebarProps {
   onFilterChange: (filter: FilterMode) => void;
   downloadCounts: DownloadCounts;
   activeDownloads?: number;
-  onCreateTorrent?: () => void;
 }
 
 const navItems: NavItem[] = [
@@ -63,16 +62,14 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onFilterChange,
   downloadCounts,
   activeDownloads = 0,
-  onCreateTorrent,
 }) => {
   const [isDownloadsExpanded, setIsDownloadsExpanded] = useState(currentPage === 'downloads');
 
   const handleNavClick = (item: NavItem) => {
     if (item.id === 'downloads') {
       setIsDownloadsExpanded(!isDownloadsExpanded);
-      if (currentPage !== 'downloads') {
-        onNavigate('downloads');
-      }
+      // Always call onNavigate to let parent decide
+      onNavigate('downloads');
     } else {
       onNavigate(item.id);
     }
@@ -144,8 +141,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
         {/* Create Torrent Action */}
         <div className="sidebar-actions">
           <button 
-            className="sidebar-action-btn create-torrent-btn"
-            onClick={onCreateTorrent}
+            className={`sidebar-action-btn create-torrent-btn ${currentPage === 'create-torrent' ? 'active' : ''}`}
+            onClick={() => onNavigate('create-torrent')}
             title="Create new torrent file"
           >
             <span className="sidebar-action-icon">

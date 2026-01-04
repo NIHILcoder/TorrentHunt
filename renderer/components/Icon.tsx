@@ -11,6 +11,7 @@ export type IconName =
   | 'download'
   | 'upload'
   | 'folder'
+  | 'folder-open'
   | 'file'
   | 'settings'
   | 'play'
@@ -30,6 +31,7 @@ export type IconName =
   | 'search'
   | 'plus'
   | 'minus'
+  | 'minus-circle'
   | 'chevron-right'
   | 'chevron-down'
   | 'chevron-up'
@@ -44,6 +46,7 @@ export type IconName =
   | 'percent'
   | 'hard-drive'
   | 'check-circle'
+  | 'x-circle'
   | 'sun'
   | 'moon'
   | 'monitor'
@@ -57,6 +60,7 @@ export type IconName =
   | 'arrow-down'
   | 'arrow-up'
   | 'arrow-right'
+  | 'arrow-left'
   | 'chevron-left'
   | 'type'
   | 'zap'
@@ -65,7 +69,15 @@ export type IconName =
   | 'folder-plus'
   | 'loader'
   | 'copy'
-  | 'user';
+  | 'user'
+  | 'eye'
+  | 'globe'
+  | 'lock'
+  | 'circle'
+  | 'layers'
+  | 'tv'
+  | 'layout-template'
+  | 'qr-code';
 
 interface IconProps {
   name: IconName;
@@ -133,6 +145,18 @@ const paths: Record<IconName, string> = {
   'folder-plus': 'M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z M12 11v6 M9 14h6',
   'loader': 'M12 2v4 M12 18v4 M4.93 4.93l2.83 2.83 M16.24 16.24l2.83 2.83 M2 12h4 M18 12h4 M4.93 19.07l2.83-2.83 M16.24 7.76l2.83-2.83',
   'copy': 'M20 9h-9a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h9a2 2 0 0 0 2-2v-9a2 2 0 0 0-2-2z M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1',
+  'eye': 'M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6z',
+  'globe': 'M12 22c5.523 0 10-4.477 10-10S17.523 2 12 2 2 6.477 2 12s4.477 10 10 10z M2 12h20 M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z',
+  'lock': 'M19 11H5a2 2 0 0 0-2 2v7a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7a2 2 0 0 0-2-2z M7 11V7a5 5 0 0 1 10 0v4',
+  'circle': 'M12 22c5.523 0 10-4.477 10-10S17.523 2 12 2 2 6.477 2 12s4.477 10 10 10z',
+  'layers': 'M12 2L2 7l10 5 10-5-10-5z M2 17l10 5 10-5 M2 12l10 5 10-5',
+  'tv': 'M20 7H4a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2z M17 2l-5 5-5-5',
+  'layout-template': 'M3 3h7v7H3z M14 3h7v7h-7z M14 14h7v7h-7z M3 14h7v7H3z',
+  'qr-code': 'M3 3h7v7H3z M14 3h7v7h-7z M14 14h7v7h-7z M3 14h7v7H3z M5 5h3v3H5z M16 5h3v3h-3z M16 16h3v3h-3z M5 16h3v3H5z',
+  'folder-open': 'M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2v3 M2 13h20',
+  'minus-circle': 'M12 22c5.523 0 10-4.477 10-10S17.523 2 12 2 2 6.477 2 12s4.477 10 10 10z M8 12h8',
+  'x-circle': 'M12 22c5.523 0 10-4.477 10-10S17.523 2 12 2 2 6.477 2 12s4.477 10 10 10z M15 9l-6 6 M9 9l6 6',
+  'arrow-left': 'M19 12H5 M12 19l-7-7 7-7',
 };
 
 export const Icon: React.FC<IconProps> = ({
