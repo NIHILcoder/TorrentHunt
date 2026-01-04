@@ -183,7 +183,7 @@ const SettingsPage: React.FC = () => {
   const handleSchedulerToggle = async () => {
     try {
       const newEnabled = !schedulerEnabled;
-      await window.api.updateScheduler({ enabled: newEnabled });
+      await window.api.setSchedulerEnabled(newEnabled);
       setSchedulerEnabled(newEnabled);
       setMessage({ type: 'success', text: newEnabled ? 'Планировщик включен' : 'Планировщик выключен' });
     } catch (error) {
@@ -212,7 +212,7 @@ const SettingsPage: React.FC = () => {
 
   const handleSelectDirectory = async () => {
     try {
-      const path = await window.api.selectDirectory();
+      const path = await window.api.invoke('select-directory');
       if (path) {
         setDefaultDownloadDir(path);
       }
@@ -268,8 +268,7 @@ const SettingsPage: React.FC = () => {
   const handleClearCache = async () => {
     setClearingCache(true);
     try {
-      // Mock - implement actual cache clearing later
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      await window.api.invoke('clear-cache');
       setMessage({ type: 'success', text: 'Кеш успешно очищен!' });
     } catch (error) {
       console.error('Failed to clear cache:', error);
@@ -339,8 +338,7 @@ const SettingsPage: React.FC = () => {
 
   const handleExportSettings = async () => {
     try {
-      // Mock - implement actual export later
-      await new Promise(resolve => setTimeout(resolve, 500));
+      await window.api.invoke('export-settings');
       setMessage({ type: 'success', text: 'Настройки экспортированы!' });
     } catch (error) {
       console.error('Failed to export settings:', error);
@@ -350,8 +348,7 @@ const SettingsPage: React.FC = () => {
 
   const handleImportSettings = async () => {
     try {
-      // Mock - implement actual import later
-      await new Promise(resolve => setTimeout(resolve, 500));
+      await window.api.invoke('import-settings');
       await loadSettings();
       setMessage({ type: 'success', text: 'Настройки импортированы!' });
     } catch (error) {
@@ -362,8 +359,7 @@ const SettingsPage: React.FC = () => {
 
   const handleCheckForUpdates = async () => {
     try {
-      // Mock - implement actual update check later
-      await new Promise(resolve => setTimeout(resolve, 500));
+      await window.api.invoke('check-for-updates');
       setMessage({ type: 'success', text: 'Проверка обновлений запущена' });
     } catch (error) {
       console.error('Failed to check for updates:', error);
@@ -390,7 +386,7 @@ const SettingsPage: React.FC = () => {
         </div>
 
         {message && (
-          <Alert variant={message.type === 'success' ? 'success' : 'error'} onClose={() => setMessage(null)}>
+          <Alert variant={message.type === 'success' ? 'success' : 'danger'} onClose={() => setMessage(null)}>
             {message.text}
           </Alert>
         )}
@@ -398,9 +394,8 @@ const SettingsPage: React.FC = () => {
         <Tabs tabs={tabs} activeTab={activeTab} onTabChange={setActiveTab} />
 
         <div className="settings-content">
-          <div className="settings-content-inner">
-            {/* General Tab */}
-            {activeTab === 'general' && (
+          {/* General Tab */}
+          {activeTab === 'general' && (
             <>
               <section className="settings-section">
                 <h2 className="settings-section-title">
@@ -810,7 +805,6 @@ const SettingsPage: React.FC = () => {
               </section>
             </>
           )}
-          </div>
         </div>
 
         {hasChanges && (

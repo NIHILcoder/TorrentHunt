@@ -1,0 +1,87 @@
+.proxy-settings {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.proxy-config {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 16px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+}
+
+.proxy-field {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.proxy-field.flex-1 {
+  flex: 1;
+}
+
+.proxy-label {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-primary);
+}
+
+.proxy-input,
+.proxy-select {
+  padding: 10px 12px;
+  background: rgba(0, 0, 0, 0.2);
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  color: var(--text-primary);
+  font-size: 14px;
+  font-family: inherit;
+  transition: all 0.2s;
+}
+
+.proxy-input:focus,
+.proxy-select:focus {
+  outline: none;
+  border-color: var(--primary-color);
+  background: rgba(0, 0, 0, 0.3);
+}
+
+.proxy-input-port {
+  width: 100px;
+}
+
+.proxy-row {
+  display: flex;
+  gap: 12px;
+}
+
+.proxy-auth {
+  padding: 12px;
+  background: rgba(0, 0, 0, 0.2);
+  border-radius: 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.proxy-auth-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-secondary);
+}
+
+@media (max-width: 768px) {
+  .proxy-row {
+    flex-direction: column;
+  }
+
+  .proxy-input-port {
+    width: 100%;
+  }
+}

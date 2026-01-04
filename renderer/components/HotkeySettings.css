@@ -1,0 +1,234 @@
+.hotkey-settings {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.hotkey-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px;
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 12px;
+  gap: 16px;
+}
+
+.hotkey-header-info {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex: 1;
+}
+
+.hotkey-header-info h3 {
+  margin: 0 0 4px 0;
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.hotkey-header-info p {
+  margin: 0;
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+
+.btn-reset-hotkeys {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 16px;
+  background: rgba(239, 68, 68, 0.1);
+  border: 1px solid rgba(239, 68, 68, 0.3);
+  border-radius: 8px;
+  color: #ef4444;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+  white-space: nowrap;
+}
+
+.btn-reset-hotkeys:hover {
+  background: rgba(239, 68, 68, 0.2);
+}
+
+.hotkey-category {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.hotkey-category-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-primary);
+  padding: 8px 12px;
+  background: rgba(96, 165, 250, 0.1);
+  border-left: 3px solid var(--primary-color);
+  border-radius: 4px;
+}
+
+.hotkey-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.hotkey-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  gap: 16px;
+  transition: all 0.2s;
+}
+
+.hotkey-item:hover {
+  background: rgba(255, 255, 255, 0.05);
+  border-color: rgba(96, 165, 250, 0.3);
+}
+
+.hotkey-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.hotkey-label {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text-primary);
+  margin-bottom: 2px;
+}
+
+.hotkey-description {
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.hotkey-control {
+  flex-shrink: 0;
+}
+
+.hotkey-display {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 12px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s;
+  min-width: 150px;
+  justify-content: space-between;
+}
+
+.hotkey-display:hover {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: var(--primary-color);
+}
+
+.hotkey-keys {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.hotkey-key {
+  padding: 4px 8px;
+  background: rgba(0, 0, 0, 0.3);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 4px;
+  font-size: 12px;
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  font-weight: 600;
+  color: var(--text-primary);
+  box-shadow: 0 2px 0 rgba(0, 0, 0, 0.2);
+}
+
+.hotkey-plus {
+  color: var(--text-secondary);
+  font-size: 12px;
+  padding: 0 2px;
+}
+
+.hotkey-empty {
+  font-size: 12px;
+  color: var(--text-secondary);
+  font-style: italic;
+}
+
+.hotkey-recorder {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  background: rgba(96, 165, 250, 0.1);
+  border: 2px solid var(--primary-color);
+  border-radius: 6px;
+  min-width: 150px;
+  outline: none;
+  animation: pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%,
+  100% {
+    border-color: var(--primary-color);
+  }
+  50% {
+    border-color: rgba(96, 165, 250, 0.5);
+  }
+}
+
+.hotkey-recorder-text {
+  flex: 1;
+  font-size: 13px;
+  color: var(--primary-color);
+  font-weight: 500;
+}
+
+.btn-cancel-recording {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  background: rgba(239, 68, 68, 0.2);
+  border: none;
+  border-radius: 4px;
+  color: #ef4444;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.btn-cancel-recording:hover {
+  background: rgba(239, 68, 68, 0.3);
+}
+
+@media (max-width: 768px) {
+  .hotkey-header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .hotkey-item {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .hotkey-control {
+    width: 100%;
+  }
+
+  .hotkey-display,
+  .hotkey-recorder {
+    width: 100%;
+  }
+}

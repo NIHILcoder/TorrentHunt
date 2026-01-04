@@ -77,7 +77,19 @@ export type IconName =
   | 'layers'
   | 'tv'
   | 'layout-template'
-  | 'qr-code';
+  | 'qr-code'
+  | 'bell'
+  | 'keyboard'
+  | 'shield'
+  | 'upload-cloud'
+  | 'download-cloud'
+  | 'network'
+  | 'gauge'
+  | 'power'
+  | 'refresh-cw'
+  | 'rotate-ccw'
+  | 'trending-up'
+  | 'edit-2';
 
 interface IconProps {
   name: IconName;
@@ -157,6 +169,18 @@ const paths: Record<IconName, string> = {
   'minus-circle': 'M12 22c5.523 0 10-4.477 10-10S17.523 2 12 2 2 6.477 2 12s4.477 10 10 10z M8 12h8',
   'x-circle': 'M12 22c5.523 0 10-4.477 10-10S17.523 2 12 2 2 6.477 2 12s4.477 10 10 10z M15 9l-6 6 M9 9l6 6',
   'arrow-left': 'M19 12H5 M12 19l-7-7 7-7',
+  'bell': 'M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9 M13.73 21a2 2 0 0 1-3.46 0',
+  'keyboard': 'M6 8h.01 M10 8h.01 M14 8h.01 M18 8h.01 M6 12h.01 M10 12h.01 M14 12h.01 M18 12h.01 M8 16h8 M2 4h20v16H2z',
+  'shield': 'M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z',
+  'upload-cloud': 'M16 16l-4-4-4 4 M12 12v9 M20.39 18.39A5 5 0 0 0 18 9h-1.26A8 8 0 1 0 3 16.3 M16 16l-4-4-4 4',
+  'download-cloud': 'M8 17l4 4 4-4 M12 12v9 M20.88 18.09A5 5 0 0 0 18 9h-1.26A8 8 0 1 0 3 16.3 M8 17l4 4 4-4',
+  'network': 'M12 2v20 M17 5a1 1 0 0 1 1 1v4a1 1 0 0 1-1 1h-2 M7 5a1 1 0 0 0-1 1v4a1 1 0 0 0 1 1h2 M17 13a1 1 0 0 1 1 1v4a1 1 0 0 1-1 1h-2 M7 13a1 1 0 0 0-1 1v4a1 1 0 0 0 1 1h2',
+  'gauge': 'M12 22c5.523 0 10-4.477 10-10S17.523 2 12 2 2 6.477 2 12s4.477 10 10 10z M12 17a5 5 0 1 0 0-10 5 5 0 0 0 0 10z M12 12l2.5 2.5',
+  'power': 'M12 2v10 M18.36 6.64a9 9 0 1 1-12.73 0',
+  'refresh-cw': 'M23 4v6h-6 M1 20v-6h6 M3.51 9a9 9 0 0 1 14.85-3.36L23 10 M1 14l4.64 4.36A9 9 0 0 0 20.49 15',
+  'rotate-ccw': 'M1 4v6h6 M3.51 15a9 9 0 1 0 2.13-9.36L1 10',
+  'trending-up': 'M23 6l-9.5 9.5-5-5L1 18 M16 6h7v7',
+  'edit-2': 'M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z',
 };
 
 export const Icon: React.FC<IconProps> = ({
