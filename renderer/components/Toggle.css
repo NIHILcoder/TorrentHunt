@@ -1,0 +1,178 @@
+/**
+ * Toggle Component - Modern 2026 Style
+ */
+
+.toggle-container {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.toggle-container.disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* === Toggle Switch (Modern 2026 Style) === */
+.toggle-switch {
+  position: relative;
+  background: linear-gradient(135deg, rgba(107, 114, 128, 0.2) 0%, rgba(75, 85, 99, 0.3) 100%);
+  border: 2px solid rgba(107, 114, 128, 0.25);
+  border-radius: 100px;
+  cursor: pointer;
+  transition: all 250ms cubic-bezier(0.4, 0, 0.2, 1);
+  user-select: none;
+  -webkit-user-select: none;
+  box-shadow: 
+    inset 0 2px 4px rgba(0, 0, 0, 0.1),
+    0 1px 2px rgba(0, 0, 0, 0.05);
+  flex-shrink: 0;
+}
+
+.toggle-switch.small {
+  width: 40px;
+  height: 22px;
+}
+
+.toggle-switch.medium {
+  width: 52px;
+  height: 28px;
+}
+
+.toggle-switch.large {
+  width: 64px;
+  height: 34px;
+}
+
+.toggle-switch.disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.toggle-switch:not(.disabled):hover {
+  background: linear-gradient(135deg, rgba(107, 114, 128, 0.25) 0%, rgba(75, 85, 99, 0.35) 100%);
+  border-color: rgba(107, 114, 128, 0.35);
+  transform: translateY(-1px);
+  box-shadow: 
+    inset 0 2px 4px rgba(0, 0, 0, 0.1),
+    0 2px 4px rgba(0, 0, 0, 0.08);
+}
+
+.toggle-switch.active {
+  background: linear-gradient(135deg, #60a5fa 0%, #3b82f6 100%);
+  border-color: #3b82f6;
+  box-shadow: 
+    inset 0 1px 2px rgba(0, 0, 0, 0.1),
+    0 0 0 3px rgba(96, 165, 250, 0.15),
+    0 2px 8px rgba(59, 130, 246, 0.3);
+}
+
+.toggle-switch.active:not(.disabled):hover {
+  background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+  transform: translateY(-1px);
+  box-shadow: 
+    inset 0 1px 2px rgba(0, 0, 0, 0.15),
+    0 0 0 3px rgba(96, 165, 250, 0.2),
+    0 4px 12px rgba(59, 130, 246, 0.35);
+}
+
+/* Slider */
+.toggle-slider {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  background: linear-gradient(135deg, #ffffff 0%, #f9fafb 100%);
+  border-radius: 50%;
+  transition: all 250ms cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: 
+    0 2px 4px rgba(0, 0, 0, 0.2),
+    0 1px 2px rgba(0, 0, 0, 0.1),
+    inset 0 -1px 1px rgba(0, 0, 0, 0.05);
+  pointer-events: none;
+  user-select: none;
+}
+
+.toggle-switch.small .toggle-slider {
+  width: 16px;
+  height: 16px;
+}
+
+.toggle-switch.medium .toggle-slider {
+  width: 20px;
+  height: 20px;
+}
+
+.toggle-switch.large .toggle-slider {
+  width: 26px;
+  height: 26px;
+}
+
+.toggle-switch.small.active .toggle-slider {
+  transform: translateX(18px);
+}
+
+.toggle-switch.medium.active .toggle-slider {
+  transform: translateX(24px);
+}
+
+.toggle-switch.large.active .toggle-slider {
+  transform: translateX(30px);
+}
+
+.toggle-switch.active .toggle-slider {
+  background: linear-gradient(135deg, #ffffff 0%, #fefefe 100%);
+  box-shadow: 
+    0 3px 6px rgba(0, 0, 0, 0.25),
+    0 2px 4px rgba(0, 0, 0, 0.15),
+    inset 0 -1px 2px rgba(0, 0, 0, 0.08);
+}
+
+/* Focus state */
+.toggle-switch:focus-visible {
+  outline: none;
+  box-shadow: 
+    0 0 0 3px rgba(96, 165, 250, 0.4),
+    inset 0 2px 4px rgba(0, 0, 0, 0.1),
+    0 2px 4px rgba(0, 0, 0, 0.08);
+}
+
+/* Active (pressed) state */
+.toggle-switch:not(.disabled):active .toggle-slider {
+  width: calc(100% - 24px);
+}
+
+.toggle-switch.small:not(.disabled):active .toggle-slider {
+  width: 20px;
+}
+
+.toggle-switch.medium:not(.disabled):active .toggle-slider {
+  width: 24px;
+}
+
+.toggle-switch.large:not(.disabled):active .toggle-slider {
+  width: 30px;
+}
+
+.toggle-switch.small.active:not(.disabled):active .toggle-slider {
+  transform: translateX(14px);
+}
+
+.toggle-switch.medium.active:not(.disabled):active .toggle-slider {
+  transform: translateX(20px);
+}
+
+.toggle-switch.large.active:not(.disabled):active .toggle-slider {
+  transform: translateX(24px);
+}
+
+/* Label */
+.toggle-label {
+  font-size: 0.9375rem;
+  font-weight: 500;
+  color: var(--color-text-primary);
+  user-select: none;
+}
+
+.toggle-container.disabled .toggle-label {
+  color: var(--color-text-tertiary);
+}

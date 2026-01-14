@@ -127,6 +127,21 @@ const SettingsPage: React.FC = () => {
     const savedTheme = localStorage.getItem('theme') as Theme || 'system';
     setTheme(savedTheme);
     applyTheme(savedTheme);
+    
+    // Load saved hotkeys
+    try {
+      const savedHotkeys = localStorage.getItem('hotkeys');
+      if (savedHotkeys) {
+        const hotkeysMap = JSON.parse(savedHotkeys);
+        const updatedHotkeys = defaultHotkeys.map(h => ({
+          ...h,
+          keys: hotkeysMap[h.id] || h.keys
+        }));
+        setHotkeys(updatedHotkeys);
+      }
+    } catch (error) {
+      console.error('Failed to load hotkeys:', error);
+    }
   }, []);
 
   useEffect(() => {
@@ -312,11 +327,27 @@ const SettingsPage: React.FC = () => {
   };
 
   const handleHotkeyChange = (hotkeyId: string, keys: string[]) => {
-    setHotkeys(hotkeys.map((h) => (h.id === hotkeyId ? { ...h, keys } : h)));
+    const updatedHotkeys = hotkeys.map((h) => (h.id === hotkeyId ? { ...h, keys } : h));
+    setHotkeys(updatedHotkeys);
+    
+    // Save to localStorage
+    const hotkeysMap: Record<string, string[]> = {};
+    updatedHotkeys.forEach(h => {
+      hotkeysMap[h.id] = h.keys;
+    });
+    localStorage.setItem('hotkeys', JSON.stringify(hotkeysMap));
   };
 
   const handleResetHotkeys = () => {
     setHotkeys([...defaultHotkeys]);
+    
+    // Save default to localStorage
+    const hotkeysMap: Record<string, string[]> = {};
+    defaultHotkeys.forEach(h => {
+      hotkeysMap[h.id] = h.keys;
+    });
+    localStorage.setItem('hotkeys', JSON.stringify(hotkeysMap));
+    
     setMessage({ type: 'success', text: 'Горячие клавиши сброшены!' });
   };
 

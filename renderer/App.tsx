@@ -74,6 +74,87 @@ const App: React.FC = () => {
     return () => unsubscribe();
   }, []);
 
+  // Global hotkeys handler
+  useEffect(() => {
+    // Load hotkeys from localStorage
+    const loadHotkeys = () => {
+      try {
+        const saved = localStorage.getItem('hotkeys');
+        return saved ? JSON.parse(saved) : null;
+      } catch {
+        return null;
+      }
+    };
+
+    const savedHotkeys = loadHotkeys();
+
+    // Default hotkeys (using event.code for keyboard layout independence)
+    const defaultHotkeysMap = {
+      'open-downloads': ['Ctrl', 'KeyD'],
+      'open-catalog': ['Ctrl', 'KeyK'],
+      'open-settings': ['Ctrl', 'Comma'],
+      'add-torrent': ['Ctrl', 'KeyO'],
+      'create-torrent': ['Ctrl', 'KeyN'],
+    };
+
+    // Merge with saved hotkeys
+    const hotkeysMap = savedHotkeys || defaultHotkeysMap;
+
+    const handleGlobalKeyDown = (e: KeyboardEvent) => {
+      // Don't trigger hotkeys when typing in input fields
+      const target = e.target as HTMLElement;
+      if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable) {
+        return;
+      }
+
+      // Build current key combination using event.code for layout independence
+      const keys: string[] = [];
+      if (e.ctrlKey) keys.push('Ctrl');
+      if (e.shiftKey) keys.push('Shift');
+      if (e.altKey) keys.push('Alt');
+      if (e.metaKey) keys.push('Meta');
+      
+      // Use event.code for physical key position
+      const code = e.code;
+      if (code && !['ControlLeft', 'ControlRight', 'ShiftLeft', 'ShiftRight', 'AltLeft', 'AltRight', 'MetaLeft', 'MetaRight'].includes(code)) {
+        keys.push(code);
+      }
+
+      // Match hotkey
+      const keyString = keys.join('+');
+      for (const [action, hotkeyKeys] of Object.entries(hotkeysMap)) {
+        const hotkeyString = (hotkeyKeys as string[]).join('+');
+        if (keyString === hotkeyString) {
+          e.preventDefault();
+          
+          // Execute action
+          switch (action) {
+            case 'open-downloads':
+              setCurrentPage('downloads');
+              break;
+            case 'open-catalog':
+              setCurrentPage('catalog');
+              break;
+            case 'open-settings':
+              setCurrentPage('settings');
+              break;
+            case 'create-torrent':
+              setCurrentPage('create-torrent');
+              break;
+            case 'add-torrent':
+              // TODO: Open add torrent dialog
+              console.log('Add torrent hotkey pressed');
+              break;
+          }
+          break;
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleGlobalKeyDown);
+    return () => window.removeEventListener('keydown', handleGlobalKeyDown);
+  }, []);
+
   // Calculate download counts for sidebar
   const downloadCounts = useMemo(() => ({
     all: downloads.length,
