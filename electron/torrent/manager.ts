@@ -59,6 +59,7 @@ export class TorrentManager {
   private client: WebTorrent.Instance;
   private managedTorrents: Map<string, ManagedTorrent> = new Map();
   private infoHashIndex: Map<string, string> = new Map(); // infoHash -> download id
+    private addingTorrents: Set<string> = new Set(); // infoHashes being added (to prevent race conditions)
   private statsInterval: NodeJS.Timeout | null = null;
   private statsCallbacks: Set<StatsCallback> = new Set();
   private maxActiveDownloads = 3;
@@ -365,152 +366,176 @@ export class TorrentManager {
 
     // 2. Check for duplicates by infoHash - check BOTH index and all managed torrents
     if (infoHashToCheck) {
-      // Check index first
-      const existingId = this.infoHashIndex.get(infoHashToCheck);
-      if (existingId) {
-        const existing = this.managedTorrents.get(existingId);
-        if (existing && existing.download.status !== 'removed') {
-          const errorMessage = `Этот торрент уже в загрузках: "${existing.download.name}"`;
-          log.warn('Duplicate torrent rejected (by infoHash index)', { 
-            infoHash: infoHashToCheck,
-            existingId, 
-            existingName: existing.download.name 
-          });
-          throw new TorrentError(errorMessage, 'DUPLICATE');
+      // Check if already being added (race condition protection)
+      if (this.addingTorrents.has(infoHashToCheck)) {
+        const errorMessage = 'Этот торрент уже добавляется, пожалуйста подождите';
+        log.warn('Duplicate torrent rejected (currently being added)', {
+          infoHash: infoHashToCheck
+        });
+        throw new TorrentError(errorMessage, 'DUPLICATE');
+      }
+
+      // Mark as being added
+      this.addingTorrents.add(infoHashToCheck);
+      log.debug('Marked torrent as being added', { infoHash: infoHashToCheck });
+    }
+
+    try {
+      // Continue with duplicate checks
+      if (infoHashToCheck) {
+        // Check index first
+        const existingId = this.infoHashIndex.get(infoHashToCheck);
+        if (existingId) {
+          const existing = this.managedTorrents.get(existingId);
+          if (existing && existing.download.status !== 'removed') {
+            const errorMessage = `Этот торрент уже в загрузках: "${existing.download.name}"`;
+            log.warn('Duplicate torrent rejected (by infoHash index)', {
+              infoHash: infoHashToCheck,
+              existingId,
+              existingName: existing.download.name
+            });
+            throw new TorrentError(errorMessage, 'DUPLICATE');
+          }
+        }
+
+        // Also check all managed torrents directly (in case index is out of sync)
+        for (const [existingId, managed] of this.managedTorrents.entries()) {
+          if (managed.download.status === 'removed') continue;
+          if (managed.infoHash === infoHashToCheck) {
+            const errorMessage = `Этот торрент уже в загрузках: "${managed.download.name}"`;
+            log.warn('Duplicate torrent rejected (by managed torrents scan)', {
+              infoHash: infoHashToCheck,
+              existingId,
+              existingName: managed.download.name
+            });
+            throw new TorrentError(errorMessage, 'DUPLICATE');
+          }
         }
       }
-      
-      // Also check all managed torrents directly (in case index is out of sync)
+
+      // 3. Fallback: check by source URI (for cases where infoHash couldn't be extracted)
       for (const [existingId, managed] of this.managedTorrents.entries()) {
         if (managed.download.status === 'removed') continue;
-        if (managed.infoHash === infoHashToCheck) {
-          const errorMessage = `Этот торрент уже в загрузках: "${managed.download.name}"`;
-          log.warn('Duplicate torrent rejected (by managed torrents scan)', { 
-            infoHash: infoHashToCheck,
-            existingId, 
-            existingName: managed.download.name 
-          });
-          throw new TorrentError(errorMessage, 'DUPLICATE');
-        }
-      }
-    }
 
-    // 3. Fallback: check by source URI (for cases where infoHash couldn't be extracted)
-    for (const [existingId, managed] of this.managedTorrents.entries()) {
-      if (managed.download.status === 'removed') continue;
-      
-      if (params.sourceType === 'magnet' && managed.download.sourceType === 'magnet') {
-        if (managed.download.sourceUri === params.sourceUri) {
-          const errorMessage = `Этот торрент уже в загрузках: "${managed.download.name}"`;
-          log.warn('Duplicate torrent rejected (by magnet URI)', { 
-            existingId, 
-            existingName: managed.download.name 
-          });
-          throw new TorrentError(errorMessage, 'DUPLICATE');
+        if (params.sourceType === 'magnet' && managed.download.sourceType === 'magnet') {
+          if (managed.download.sourceUri === params.sourceUri) {
+            const errorMessage = `Этот торрент уже в загрузках: "${managed.download.name}"`;
+            log.warn('Duplicate torrent rejected (by magnet URI)', {
+              existingId,
+              existingName: managed.download.name
+            });
+            throw new TorrentError(errorMessage, 'DUPLICATE');
+          }
         }
       }
-    }
-    
-    // 4. Check by torrent file name to prevent downloading the same file twice
-    if (params.name && params.name !== 'Loading...') {
-      for (const [existingId, managed] of this.managedTorrents.entries()) {
-        if (managed.download.status === 'removed') continue;
-        
-        // Compare normalized names (case-insensitive, trimmed)
-        const normalizedNewName = params.name.toLowerCase().trim();
-        const normalizedExistingName = managed.download.name.toLowerCase().trim();
-        
-        if (normalizedNewName === normalizedExistingName) {
-          const errorMessage = `Торрент с таким именем уже в загрузках: "${managed.download.name}"`;
-          log.warn('Duplicate torrent rejected (by name)', { 
-            existingId, 
-            existingName: managed.download.name,
-            newName: params.name
-          });
-          throw new TorrentError(errorMessage, 'DUPLICATE');
-        }
-      }
-    }
 
-    const settings = await db.getSettings();
-    const savePath = params.savePath || settings.defaultDownloadDir;
-    
-    // Ensure save directory exists
-    if (!fs.existsSync(savePath)) {
-      fs.mkdirSync(savePath, { recursive: true });
-    }
-    
-    // Check available disk space
-    const availableSpace = await checkDiskSpace(savePath);
-    const minimumRequired = 100 * 1024 * 1024; // 100 MB minimum
-    
-    if (availableSpace !== null && availableSpace < minimumRequired) {
-      const errorMessage = `Недостаточно места на диске. Доступно: ${formatBytes(availableSpace)}, требуется минимум ${formatBytes(minimumRequired)}`;
-      log.error('Insufficient disk space', { 
-        savePath, 
-        available: availableSpace, 
-        required: minimumRequired,
-        formatted: formatBytes(availableSpace)
+      // 4. Check by torrent file name to prevent downloading the same file twice
+      if (params.name && params.name !== 'Loading...') {
+        for (const [existingId, managed] of this.managedTorrents.entries()) {
+          if (managed.download.status === 'removed') continue;
+
+          // Compare normalized names (case-insensitive, trimmed)
+          const normalizedNewName = params.name.toLowerCase().trim();
+          const normalizedExistingName = managed.download.name.toLowerCase().trim();
+
+          if (normalizedNewName === normalizedExistingName) {
+            const errorMessage = `Торрент с таким именем уже в загрузках: "${managed.download.name}"`;
+            log.warn('Duplicate torrent rejected (by name)', {
+              existingId,
+              existingName: managed.download.name,
+              newName: params.name
+            });
+            throw new TorrentError(errorMessage, 'DUPLICATE');
+          }
+        }
+      }
+
+      const settings = await db.getSettings();
+      const savePath = params.savePath || settings.defaultDownloadDir;
+
+      // Ensure save directory exists
+      if (!fs.existsSync(savePath)) {
+        fs.mkdirSync(savePath, { recursive: true });
+      }
+
+      // Check available disk space
+      const availableSpace = await checkDiskSpace(savePath);
+      const minimumRequired = 100 * 1024 * 1024; // 100 MB minimum
+
+      if (availableSpace !== null && availableSpace < minimumRequired) {
+        const errorMessage = `Недостаточно места на диске. Доступно: ${formatBytes(availableSpace)}, требуется минимум ${formatBytes(minimumRequired)}`;
+        log.error('Insufficient disk space', {
+          savePath,
+          available: availableSpace,
+          required: minimumRequired,
+          formatted: formatBytes(availableSpace)
+        });
+        throw new TorrentError(errorMessage, 'NO_SPACE');
+      }
+
+      if (availableSpace !== null) {
+        log.info('Disk space check passed', {
+          savePath,
+          available: formatBytes(availableSpace)
+        });
+      } else {
+        log.warn('Could not verify disk space', { savePath });
+      }
+
+      let torrentFilePath: string | undefined;
+      const sourceUri = params.sourceUri;
+
+      // If it's a torrent file, copy it to app data
+      if (params.sourceType === 'torrent_file') {
+        const appDataDir = path.join(app.getPath('userData'), 'torrents');
+        if (!fs.existsSync(appDataDir)) {
+          fs.mkdirSync(appDataDir, { recursive: true });
+        }
+
+        const fileName = path.basename(params.sourceUri);
+        torrentFilePath = path.join(appDataDir, `${Date.now()}_${fileName}`);
+        fs.copyFileSync(params.sourceUri, torrentFilePath);
+        log.debug('Torrent file copied', { from: params.sourceUri, to: torrentFilePath });
+      }
+
+      // Create database record
+      const download = await db.createDownload({
+        name: params.name || 'Loading...',
+        sourceType: params.sourceType,
+        sourceUri,
+        torrentFilePath,
+        savePath,
+        status: 'queued',
       });
-      throw new TorrentError(errorMessage, 'NO_SPACE');
-    }
-    
-    if (availableSpace !== null) {
-      log.info('Disk space check passed', { 
-        savePath, 
-        available: formatBytes(availableSpace) 
-      });
-    } else {
-      log.warn('Could not verify disk space', { savePath });
-    }
-    
-    let torrentFilePath: string | undefined;
-    const sourceUri = params.sourceUri;
-    
-    // If it's a torrent file, copy it to app data
-    if (params.sourceType === 'torrent_file') {
-      const appDataDir = path.join(app.getPath('userData'), 'torrents');
-      if (!fs.existsSync(appDataDir)) {
-        fs.mkdirSync(appDataDir, { recursive: true });
-      }
-      
-      const fileName = path.basename(params.sourceUri);
-      torrentFilePath = path.join(appDataDir, `${Date.now()}_${fileName}`);
-      fs.copyFileSync(params.sourceUri, torrentFilePath);
-      log.debug('Torrent file copied', { from: params.sourceUri, to: torrentFilePath });
-    }
-    
-    // Create database record
-    const download = await db.createDownload({
-      name: params.name || 'Loading...',
-      sourceType: params.sourceType,
-      sourceUri,
-      torrentFilePath,
-      savePath,
-      status: 'queued',
-    });
-    
-    log.info('Download record created', { id: download.id });
 
-    // Add to managed torrents
-    this.managedTorrents.set(download.id, {
-      id: download.id,
-      torrent: null,
-      download,
-      infoHash: infoHashToCheck,
-      selectedFiles: params.selectedFiles,
-    });
-    
-    // Register infoHash immediately to prevent race conditions with duplicate detection
-    if (infoHashToCheck) {
-      this.infoHashIndex.set(infoHashToCheck, download.id);
-      log.debug('InfoHash registered early', { id: download.id, infoHash: infoHashToCheck });
+      log.info('Download record created', { id: download.id });
+
+      // Add to managed torrents
+      this.managedTorrents.set(download.id, {
+        id: download.id,
+        torrent: null,
+        download,
+        infoHash: infoHashToCheck,
+        selectedFiles: params.selectedFiles,
+      });
+
+      // Register infoHash immediately to prevent race conditions with duplicate detection
+      if (infoHashToCheck) {
+        this.infoHashIndex.set(infoHashToCheck, download.id);
+        log.debug('InfoHash registered early', { id: download.id, infoHash: infoHashToCheck });
+      }
+
+      // Process queue to potentially start this download
+      await this.processQueue();
+
+      return download;
+    } finally {
+      // Always clean up the adding marker, even if an error occurred
+      if (infoHashToCheck) {
+        this.addingTorrents.delete(infoHashToCheck);
+        log.debug('Removed torrent from adding set', { infoHash: infoHashToCheck });
+      }
     }
-    
-    // Process queue to potentially start this download
-    await this.processQueue();
-    
-    return download;
   }
   
   /**
@@ -745,7 +770,71 @@ export class TorrentManager {
     }
     return count;
   }
-  
+
+  /**
+   * Safely delete a path recursively with retry logic
+   */
+  private async deletePathRecursive(targetPath: string, downloadId: string): Promise<void> {
+    const maxRetries = 3;
+    const retryDelay = 1000;
+
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      try {
+        if (!fs.existsSync(targetPath)) {
+          log.debug('Path does not exist, skipping deletion', { path: targetPath });
+          return;
+        }
+
+        const stat = fs.statSync(targetPath);
+
+        if (stat.isDirectory()) {
+          // First, recursively delete all contents
+          const items = fs.readdirSync(targetPath);
+          for (const item of items) {
+            const itemPath = path.join(targetPath, item);
+            await this.deletePathRecursive(itemPath, downloadId);
+          }
+
+          // Then delete the empty directory
+          fs.rmdirSync(targetPath);
+          log.debug('Deleted directory', { path: targetPath });
+        } else {
+          // Delete file
+          fs.unlinkSync(targetPath);
+          log.debug('Deleted file', { path: targetPath });
+        }
+
+        return; // Success
+      } catch (e) {
+        const error = e as NodeJS.ErrnoException;
+        const errorMsg = error.message || String(e);
+
+        if (attempt < maxRetries) {
+          // Retry on permission errors or "directory not empty" errors
+          if (error.code === 'EPERM' || error.code === 'ENOTEMPTY' || error.code === 'EBUSY') {
+            log.warn(`Delete attempt ${attempt} failed, retrying...`, {
+              path: targetPath,
+              error: errorMsg,
+              code: error.code,
+            });
+            await new Promise(resolve => setTimeout(resolve, retryDelay));
+            continue;
+          }
+        }
+
+        // Final attempt failed or non-retryable error
+        log.error('Failed to delete path after retries', {
+          id: downloadId,
+          path: targetPath,
+          error: errorMsg,
+          code: error.code,
+          attempts: attempt,
+        });
+        return; // Don't throw, just log the error
+      }
+    }
+  }
+
   /**
    * Pause a download
    */
@@ -877,31 +966,16 @@ export class TorrentManager {
     
     // Delete files if requested
     if (deleteFiles) {
-      // If torrent was destroyed (e.g., during pause), manually delete files
+      // Wait a bit for file handles to be released
+      await new Promise(resolve => setTimeout(resolve, 500));
+
       const downloadPath = managed.download.savePath;
       if (fs.existsSync(downloadPath)) {
-        try {
-          const files = fs.readdirSync(downloadPath);
-          // Delete files/folders that match the download name
-          const downloadName = managed.download.name;
-          for (const file of files) {
-            if (file === downloadName || file.startsWith(downloadName)) {
-              const fullPath = path.join(downloadPath, file);
-              const stat = fs.statSync(fullPath);
-              if (stat.isDirectory()) {
-                fs.rmSync(fullPath, { recursive: true, force: true });
-                log.debug('Deleted download directory', { path: fullPath });
-              } else {
-                fs.unlinkSync(fullPath);
-                log.debug('Deleted download file', { path: fullPath });
-              }
-            }
-          }
-        } catch (e) {
-          log.error('Failed to delete downloaded files', {
-            path: downloadPath,
-            error: e instanceof Error ? e.message : String(e),
-          });
+        const downloadName = managed.download.name;
+        const targetPath = path.join(downloadPath, downloadName);
+
+        if (fs.existsSync(targetPath)) {
+          await this.deletePathRecursive(targetPath, id);
         }
       }
     }

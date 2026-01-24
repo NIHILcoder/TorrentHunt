@@ -118,6 +118,18 @@ const DownloadItem: React.FC<DownloadItemProps> = ({
   const status = currentStats.status;
   const progress = currentStats.progress;
 
+  // DEBUG: Log button visibility logic
+  if (download.id && (download.name.length < 50)) { // Limit logging
+    console.log(`[DownloadItem] ${download.name}:`, {
+      status,
+      downloadStatus: download.status,
+      hasStats: !!stats,
+      statsStatus: stats?.status,
+      canPause: canPause(status),
+      canResume: canResume(status),
+    });
+  }
+
   const getProgressVariant = (): 'default' | 'success' | 'warning' | 'error' => {
     if (status === 'completed' || status === 'seeding') return 'success';
     if (status === 'error') return 'error';
@@ -623,6 +635,8 @@ const DownloadsPage: React.FC<DownloadsPageProps> = ({
   // Subscribe to stats updates
   useEffect(() => {
     const unsubscribe = window.api.onDownloadStats((newStats) => {
+      console.log('[onDownloadStats] Received stats:', newStats.map(s => ({ id: s.id.substring(0, 8), status: s.status })));
+
       const statsMap = new Map<string, DownloadStats>();
       for (const stat of newStats) {
         statsMap.set(stat.id, stat);
@@ -634,6 +648,9 @@ const DownloadsPage: React.FC<DownloadsPageProps> = ({
         prev.map((d) => {
           const stat = statsMap.get(d.id);
           if (stat) {
+            if (d.status !== stat.status) {
+              console.log(`[onDownloadStats] Status changed for ${d.name}: ${d.status} -> ${stat.status}`);
+            }
             return { ...d, status: stat.status };
           }
           return d;
@@ -797,6 +814,7 @@ const DownloadsPage: React.FC<DownloadsPageProps> = ({
   const loadDownloads = async () => {
     try {
       const list = await window.api.getDownloads();
+      console.log('[loadDownloads] Loaded downloads:', list.map(d => ({ name: d.name, status: d.status })));
       setDownloads(list.filter(d => d.status !== 'removed'));
     } catch (error) {
       console.error('Failed to load downloads:', error);
@@ -893,9 +911,16 @@ const DownloadsPage: React.FC<DownloadsPageProps> = ({
 
   const handlePause = useCallback(async (id: string) => {
     try {
+      console.log('[handlePause] Pausing download:', id);
+
       await window.api.pauseDownload(id);
+      console.log('[handlePause] API call successful, reloading downloads');
+
       await loadDownloads(); // Reload immediately
+
+      console.log('[handlePause] Downloads reloaded');
     } catch (error) {
+      console.error('[handlePause] Error:', error);
       addToast(
         `Failed to pause: ${error instanceof Error ? error.message : String(error)}`,
         'error'
