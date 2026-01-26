@@ -6,8 +6,10 @@
     "module": "ESNext",
     "moduleResolution": "bundler",
     "jsx": "react-jsx",
-    "lib": ["ES2022", "DOM", "DOM.Iterable"]
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "resolveJsonModule": true,
+    "esModuleInterop": true
   },
-  "include": ["renderer/**/*.ts", "renderer/**/*.tsx", "shared/**/*.ts"],
+  "include": ["renderer/**/*.ts", "renderer/**/*.tsx", "shared/**/*.ts", "locales/**/*.json"],
   "exclude": ["node_modules", "dist", "electron"]
 }

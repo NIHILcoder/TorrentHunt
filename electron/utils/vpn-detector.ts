@@ -343,11 +343,19 @@ function calculateConfidence(indicators: VPNDetectionResult['indicators']): {
 
 /**
  * Show VPN warning dialog
+ * Note: Translation keys are passed to renderer for i18n support
  */
 export function showVPNWarning(result: VPNDetectionResult): void {
   const { dialog } = require('electron');
 
-  let message = 'VPN not detected! Your real IP address may be visible to peers.';
+  // Send localized warning via IPC (translations handled in renderer)
+  const warningData = {
+    type: 'vpn-warning',
+    result,
+  };
+
+  // For now, show English version (will be replaced with i18n in main process)
+  const message = 'VPN not detected! Your real IP address may be visible to peers.';
   let detail = 'Consider using a VPN for better privacy when using BitTorrent.\n\n';
 
   if (result.details.publicIP) {

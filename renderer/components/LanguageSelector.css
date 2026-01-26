@@ -1,0 +1,120 @@
+.language-selector {
+  padding: 24px;
+  background: var(--surface-color);
+  border-radius: 12px;
+  margin-bottom: 24px;
+}
+
+.language-selector-title {
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin: 0 0 8px 0;
+}
+
+.language-selector-description {
+  font-size: 14px;
+  color: var(--text-secondary);
+  margin: 0 0 20px 0;
+}
+
+.language-options {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.language-option {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 16px;
+  background: var(--background-color);
+  border: 2px solid var(--border-color);
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  width: 100%;
+  text-align: left;
+}
+
+.language-option:hover {
+  background: var(--hover-color);
+  border-color: var(--primary-color);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.language-option.active {
+  border-color: var(--primary-color);
+  background: var(--primary-light);
+  box-shadow: 0 0 0 3px rgba(var(--primary-rgb), 0.1);
+}
+
+.language-flag {
+  font-size: 32px;
+  line-height: 1;
+  flex-shrink: 0;
+}
+
+.language-info {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  flex: 1;
+}
+
+.language-native-name {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.language-english-name {
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+
+.language-checkmark {
+  width: 24px;
+  height: 24px;
+  stroke-width: 3;
+  color: var(--primary-color);
+  flex-shrink: 0;
+}
+
+/* Dark theme adjustments */
+[data-theme="dark"] .language-option:hover {
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+[data-theme="dark"] .language-option.active {
+  box-shadow: 0 0 0 3px rgba(var(--primary-rgb), 0.2);
+}
+
+/* Accessibility */
+.language-option:focus {
+  outline: none;
+  border-color: var(--primary-color);
+  box-shadow: 0 0 0 3px rgba(var(--primary-rgb), 0.2);
+}
+
+/* Animation */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.language-option {
+  animation: fadeIn 0.3s ease forwards;
+}
+
+.language-option:nth-child(1) { animation-delay: 0.05s; }
+.language-option:nth-child(2) { animation-delay: 0.1s; }
+.language-option:nth-child(3) { animation-delay: 0.15s; }

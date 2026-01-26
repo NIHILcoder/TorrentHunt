@@ -23,6 +23,7 @@ import {
   SettingsSidebar,
   SettingsCategory,
   SeedingDashboard,
+  LanguageSelector,
 } from '../components';
 import { PrivacySettings } from '../components/PrivacySettings';
 import './SettingsPage.css';
@@ -837,6 +838,10 @@ const SettingsPage: React.FC = () => {
           <h1 className="settings-category-title">Interface & Themes</h1>
           <p className="settings-category-subtitle">Customize appearance and visual style</p>
         </div>
+
+        <LanguageSelector />
+
+        <div className="settings-divider" />
 
         <div className="settings-group">
           <h3 className="settings-group-title">THEME</h3>
