@@ -4,7 +4,7 @@ import dotenv from 'dotenv';
 import { getTorrentManager } from './torrent';
 import { getCollaborativeSeedingManager } from './seeding';
 import { setupIpcHandlers } from './ipc';
-import { logger } from './utils';
+import { logger, detectVPN, showVPNWarning } from './utils';
 
 // Load environment variables
 dotenv.config();
@@ -73,6 +73,31 @@ async function initializeApp(): Promise<void> {
   // Create main window
   await createWindow();
   logger.info('App', 'Main window created.');
+
+  // Check VPN status on startup
+  setTimeout(async () => {
+    try {
+      logger.info('App', 'Checking VPN status...');
+      const vpnResult = await detectVPN();
+
+      if (!vpnResult.isVPNActive) {
+        logger.warn('App', 'VPN not detected!', {
+          confidence: vpnResult.confidence,
+          publicIP: vpnResult.details.publicIP,
+        });
+        // Show warning dialog
+        showVPNWarning(vpnResult);
+      } else {
+        logger.info('App', 'VPN detected', {
+          provider: vpnResult.details.vpnProvider,
+          confidence: vpnResult.confidence,
+          interfaces: vpnResult.details.detectedInterfaces,
+        });
+      }
+    } catch (error) {
+      logger.error('App', 'Failed to check VPN status', { error });
+    }
+  }, 2000); // Delay to let UI load first
 }
 
 app.whenReady().then(initializeApp);

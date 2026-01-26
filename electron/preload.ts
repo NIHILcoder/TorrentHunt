@@ -11,6 +11,7 @@ import {
   CreateTorrentRequest,
   CreateTorrentResult,
   CreateTorrentProgress,
+  PrivacyConfig,
 } from '../shared/types';
 
 const api: IpcApi = {
@@ -197,6 +198,24 @@ const api: IpcApi = {
 
   enableCollaborativeSeeding: (enabled: boolean) => {
     return ipcRenderer.invoke('seeding:enable', enabled);
+  },
+
+  // Privacy & Security
+  getPrivacyConfig: () => {
+    return ipcRenderer.invoke('privacy:getConfig');
+  },
+
+  updatePrivacyConfig: (updates: Partial<PrivacyConfig>) => {
+    return ipcRenderer.invoke('privacy:updateConfig', updates);
+  },
+
+  clearAllData: () => {
+    return ipcRenderer.invoke('privacy:clearAllData');
+  },
+
+  // Generic invoke for custom IPC handlers
+  invoke: <T = any>(channel: string, ...args: any[]): Promise<T> => {
+    return ipcRenderer.invoke(channel, ...args);
   },
 };
 

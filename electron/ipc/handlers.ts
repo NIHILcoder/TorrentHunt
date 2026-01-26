@@ -7,7 +7,7 @@ import { InvalidStateTransitionError } from '../../shared/state-machine';
 import catalog from '../data/catalog.json';
 import fs from 'fs';
 import path from 'path';
-import { logger } from '../utils';
+import { logger, detectVPN, showVPNWarning } from '../utils';
 
 const log = logger.child('IPC');
 
@@ -420,6 +420,42 @@ export function setupIpcHandlers(mainWindow: BrowserWindow): void {
   ipcMain.handle('seeding:enable', wrapHandler('seeding:enable',
     async (_event, enabled: boolean) => {
       return seedingManager.setEnabled(enabled);
+    }
+  ));
+
+  // Privacy & Security handlers
+  ipcMain.handle('privacy:checkVPN', wrapHandler('privacy:checkVPN',
+    async () => {
+      return await detectVPN();
+    }
+  ));
+
+  ipcMain.handle('privacy:showVPNWarning', wrapHandler('privacy:showVPNWarning',
+    async () => {
+      const result = await detectVPN();
+      if (!result.isVPNActive) {
+        showVPNWarning(result);
+      }
+      return result;
+    }
+  ));
+
+  ipcMain.handle('privacy:getConfig', wrapHandler('privacy:getConfig',
+    async () => {
+      return await db.getPrivacyConfig();
+    }
+  ));
+
+  ipcMain.handle('privacy:updateConfig', wrapHandler('privacy:updateConfig',
+    async (_event, updates: Partial<any>) => {
+      return await db.updatePrivacyConfig(updates);
+    }
+  ));
+
+  ipcMain.handle('privacy:clearAllData', wrapHandler('privacy:clearAllData',
+    async () => {
+      await db.clearAllData();
+      return { success: true };
     }
   ));
 

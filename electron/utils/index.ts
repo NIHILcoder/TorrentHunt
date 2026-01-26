@@ -1,6 +1,9 @@
 export { logger } from './logger';
 export type { LogLevel, ModuleLogger } from './logger';
 
+export { detectVPN, showVPNWarning } from './vpn-detector';
+export type { VPNDetectionResult } from './vpn-detector';
+
 import fs from 'fs';
 import path from 'path';
 import { logger } from './logger';

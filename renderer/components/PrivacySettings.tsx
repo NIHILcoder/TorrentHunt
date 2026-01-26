@@ -21,6 +21,23 @@ interface PrivacyConfig {
   sanitizeLogs: boolean;
 }
 
+interface VPNDetectionResult {
+  isVPNActive: boolean;
+  confidence: 'high' | 'medium' | 'low' | 'unknown';
+  indicators: {
+    vpnInterface: boolean;
+    ipMismatch: boolean;
+    vpnDNS: boolean;
+    vpnRoutes: boolean;
+  };
+  details: {
+    detectedInterfaces: string[];
+    publicIP?: string;
+    localIP?: string;
+    vpnProvider?: string;
+  };
+}
+
 export const PrivacySettings: React.FC = () => {
   const [config, setConfig] = useState<PrivacyConfig>({
     anonymousMode: true,
@@ -32,7 +49,9 @@ export const PrivacySettings: React.FC = () => {
     sanitizeLogs: true,
   });
 
-  const [vpnStatus] = useState<'unknown' | 'connected' | 'disconnected'>('unknown');
+  const [vpnStatus, setVpnStatus] = useState<'unknown' | 'connected' | 'disconnected'>('unknown');
+  const [vpnDetails, setVpnDetails] = useState<VPNDetectionResult | null>(null);
+  const [isCheckingVPN, setIsCheckingVPN] = useState(false);
   const [encryptionAvailable] = useState(true);
 
   useEffect(() => {
@@ -47,9 +66,17 @@ export const PrivacySettings: React.FC = () => {
   };
 
   const checkVPNStatus = async () => {
-    // Check if VPN is active
-    // const status = await window.api.checkVPN();
-    // setVpnStatus(status);
+    setIsCheckingVPN(true);
+    try {
+      const result = await window.api.invoke('privacy:checkVPN') as VPNDetectionResult;
+      setVpnDetails(result);
+      setVpnStatus(result.isVPNActive ? 'connected' : 'disconnected');
+    } catch (error) {
+      console.error('Failed to check VPN status:', error);
+      setVpnStatus('unknown');
+    } finally {
+      setIsCheckingVPN(false);
+    }
   };
 
   const handleChange = async (key: keyof PrivacyConfig, value: boolean) => {
@@ -61,9 +88,36 @@ export const PrivacySettings: React.FC = () => {
   };
 
   const handleClearAllData = async () => {
-    if (confirm('⚠️ This will permanently delete all your data including reputation, downloads history, and settings. Continue?')) {
-      // await window.api.clearAllData();
-      alert('✅ All data cleared successfully');
+    const confirmed = confirm(
+      '⚠️ This will permanently delete all your data including:\n\n' +
+      '• All downloads and torrents\n' +
+      '• Reputation and transactions\n' +
+      '• Categories and settings\n' +
+      '• All logs and temporary files\n\n' +
+      'This action CANNOT be undone!\n\n' +
+      'Are you absolutely sure?'
+    );
+
+    if (!confirmed) return;
+
+    // Second confirmation
+    const doubleConfirmed = confirm(
+      '⚠️ FINAL WARNING!\n\n' +
+      'You are about to delete ALL DATA.\n' +
+      'Type YES in your mind and click OK to proceed.'
+    );
+
+    if (!doubleConfirmed) return;
+
+    try {
+      await window.api.clearAllData();
+      alert('✅ All data cleared successfully!\n\nThe application will reload.');
+
+      // Reload the page to reflect changes
+      window.location.reload();
+    } catch (error) {
+      console.error('Failed to clear data:', error);
+      alert('❌ Failed to clear data. Check console for details.');
     }
   };
 
@@ -77,11 +131,58 @@ export const PrivacySettings: React.FC = () => {
         </p>
       </div>
 
-      {/* VPN Warning */}
-      {vpnStatus === 'disconnected' && (
+      {/* VPN Status */}
+      {vpnStatus === 'connected' && vpnDetails && (
+        <Alert variant="success">
+          <strong>✅ VPN Detected!</strong>
+          <p>
+            {vpnDetails.details.vpnProvider
+              ? `Connected via ${vpnDetails.details.vpnProvider}`
+              : 'VPN connection detected'}
+            {' '}(Confidence: {vpnDetails.confidence})
+          </p>
+          {vpnDetails.details.detectedInterfaces.length > 0 && (
+            <p style={{ fontSize: '0.85em', opacity: 0.8 }}>
+              Interfaces: {vpnDetails.details.detectedInterfaces.join(', ')}
+            </p>
+          )}
+        </Alert>
+      )}
+
+      {vpnStatus === 'disconnected' && vpnDetails && (
         <Alert variant="warning">
           <strong>⚠️ VPN Not Detected!</strong>
           <p>Your real IP address may be visible to peers. Consider using a VPN for better privacy.</p>
+          {vpnDetails.details.publicIP && (
+            <p style={{ fontSize: '0.85em', opacity: 0.8 }}>
+              Your public IP: {vpnDetails.details.publicIP}
+            </p>
+          )}
+          <Button
+            variant="secondary"
+            onClick={checkVPNStatus}
+            disabled={isCheckingVPN}
+            style={{ marginTop: '8px' }}
+          >
+            <Icon name="refresh-cw" size={14} />
+            {isCheckingVPN ? 'Checking...' : 'Re-check VPN'}
+          </Button>
+        </Alert>
+      )}
+
+      {vpnStatus === 'unknown' && (
+        <Alert variant="info">
+          <strong>ℹ️ VPN Status Unknown</strong>
+          <p>Unable to determine VPN status. Click to check manually.</p>
+          <Button
+            variant="secondary"
+            onClick={checkVPNStatus}
+            disabled={isCheckingVPN}
+            style={{ marginTop: '8px' }}
+          >
+            <Icon name="refresh-cw" size={14} />
+            {isCheckingVPN ? 'Checking...' : 'Check VPN Status'}
+          </Button>
         </Alert>
       )}
 

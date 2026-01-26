@@ -4,7 +4,7 @@
  */
 
 import Store from 'electron-store';
-import { Download, AppSettings, SourceType, Category, SchedulerConfig, UserReputation, ReputationTransaction } from '../../shared/types';
+import { Download, AppSettings, SourceType, Category, SchedulerConfig, UserReputation, ReputationTransaction, PrivacyConfig } from '../../shared/types';
 import { v4 as uuidv4 } from 'uuid';
 import { app } from 'electron';
 import path from 'path';
@@ -16,6 +16,7 @@ interface StoreSchema {
   scheduler: SchedulerConfig;
   reputation: Record<string, UserReputation>;
   transactions: Record<string, ReputationTransaction[]>;
+  privacyConfig: PrivacyConfig;
 }
 
 const defaultCategories: Category[] = [
@@ -44,6 +45,15 @@ const store = new Store<StoreSchema>({
     },
     reputation: {},
     transactions: {},
+    privacyConfig: {
+      anonymousMode: true,
+      encryptStorage: true,
+      disableLogs: false,
+      vpnCheck: true,
+      clearDataOnExit: false,
+      ephemeralPeerId: true,
+      sanitizeLogs: true,
+    },
   },
 });
 
@@ -325,6 +335,51 @@ export async function getReputationTransactions(userId: string, limit: number = 
 
   // Return last N transactions (most recent first)
   return userTransactions.slice(-limit).reverse();
+}
+
+// === Privacy Settings ===
+
+export async function getPrivacyConfig(): Promise<PrivacyConfig> {
+  return store.get('privacyConfig');
+}
+
+export async function updatePrivacyConfig(updates: Partial<PrivacyConfig>): Promise<PrivacyConfig> {
+  const current = store.get('privacyConfig');
+  const updated = { ...current, ...updates };
+  store.set('privacyConfig', updated);
+  return updated;
+}
+
+export async function clearAllData(): Promise<void> {
+  // Clear all data except default settings
+  store.clear();
+
+  // Reset to defaults
+  store.set('settings', {
+    id: 1,
+    defaultDownloadDir: path.join(app.getPath('downloads'), 'TorrentHunt'),
+    maxDownKbps: 0,
+    maxUpKbps: 0,
+    maxActiveDownloads: 3,
+    updatedAt: new Date(),
+  });
+
+  store.set('categories', defaultCategories);
+
+  store.set('scheduler', {
+    enabled: false,
+    schedules: [],
+  });
+
+  store.set('privacyConfig', {
+    anonymousMode: true,
+    encryptStorage: true,
+    disableLogs: false,
+    vpnCheck: true,
+    clearDataOnExit: false,
+    ephemeralPeerId: true,
+    sanitizeLogs: true,
+  });
 }
 
 // Export store for testing/debugging

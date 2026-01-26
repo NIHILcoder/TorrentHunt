@@ -72,6 +72,17 @@ export interface AppSettings {
   updatedAt: Date;
 }
 
+// Privacy Settings types
+export interface PrivacyConfig {
+  anonymousMode: boolean;
+  encryptStorage: boolean;
+  disableLogs: boolean;
+  vpnCheck: boolean;
+  clearDataOnExit: boolean;
+  ephemeralPeerId: boolean;
+  sanitizeLogs: boolean;
+}
+
 // Scheduler types
 export interface ScheduleEntry {
   id: string;
@@ -280,6 +291,14 @@ export interface IpcApi {
   getRecentTransactions: (limit?: number) => Promise<ReputationTransaction[]>;
   getBadges: () => Promise<Badge[]>;
   enableCollaborativeSeeding: (enabled: boolean) => Promise<void>;
+
+  // Privacy & Security
+  getPrivacyConfig: () => Promise<PrivacyConfig>;
+  updatePrivacyConfig: (updates: Partial<PrivacyConfig>) => Promise<PrivacyConfig>;
+  clearAllData: () => Promise<{ success: boolean }>;
+
+  // Generic IPC invoke for custom handlers
+  invoke: <T = any>(channel: string, ...args: any[]) => Promise<T>;
 }
 
 declare global {
