@@ -5,6 +5,7 @@ import { getTorrentManager } from './torrent';
 import { getCollaborativeSeedingManager } from './seeding';
 import { setupIpcHandlers } from './ipc';
 import { logger, detectVPN, showVPNWarning } from './utils';
+import { virusHuntService } from './services/security';
 
 // Load environment variables
 dotenv.config();
@@ -42,6 +43,8 @@ async function createWindow(): Promise<void> {
   } else {
     // __dirname is dist/electron/electron/ due to tsconfig rootDir
     await mainWindow.loadFile(path.join(__dirname, '../../renderer/index.html'));
+    // Open DevTools in production to debug issues
+    mainWindow.webContents.openDevTools();
   }
 
   mainWindow.on('closed', () => {
@@ -70,9 +73,22 @@ async function initializeApp(): Promise<void> {
   await seedingManager.initialize();
   logger.info('App', 'Collaborative Seeding Manager initialized.');
 
+  // Initialize VirusHunt security module
+  try {
+    await virusHuntService.initialize();
+    logger.info('App', 'VirusHunt security module initialized.');
+  } catch (error) {
+    logger.error('App', 'Failed to initialize VirusHunt', { error });
+  }
+
   // Create main window
   await createWindow();
   logger.info('App', 'Main window created.');
+
+  // Set main window for VirusHunt (for progress events)
+  if (mainWindow) {
+    virusHuntService.setMainWindow(mainWindow);
+  }
 
   // Check VPN status on startup
   setTimeout(async () => {

@@ -578,11 +578,17 @@ export class TorrentManager {
       
       managed.torrent = torrent;
       
-      // Transition to downloading immediately (torrent starts downloading right away)
-      // We'll update the name once 'ready' event fires
-      this.transitionStatus(id, 'downloading').catch((err) => {
-        log.error('Failed to transition to downloading', { id, error: err });
-      });
+      // Transition to downloading only if not already in a terminal/active state
+      // When restoring, we preserve the existing state (e.g., seeding, completed)
+      const currentStatus = managed.download.status;
+      if (isNew || currentStatus === 'queued' || currentStatus === 'paused') {
+        // Only transition for new downloads or resuming from queued/paused
+        this.transitionStatus(id, 'downloading').catch((err) => {
+          log.error('Failed to transition to downloading', { id, error: err });
+        });
+      } else {
+        log.debug('Preserving existing state during restore', { id, status: currentStatus });
+      }
       
       torrent.on('ready', async () => {
         // Apply file selection after torrent is ready
