@@ -20,6 +20,7 @@ import {
   ContextMenuItem,
   TorrentFileSelector
 } from '../components';
+import { useTranslation } from '../utils/i18nContext';
 import './DownloadsPage.css';
 
 // Utility functions
@@ -610,7 +611,18 @@ const DownloadsPage: React.FC<DownloadsPageProps> = ({
     if (files && files.length > 0) {
       const file = files[0];
       if (file.name.endsWith('.torrent')) {
-        setSelectedFile(file);
+        // Clear any leftover state from a previous drop
+        setSelectedFile(null);
+
+        // Use the file path directly to open the file selector
+        const filePath = (file as any).path;
+        if (filePath) {
+          setPendingTorrent({ path: filePath });
+          setShowFileSelector(true);
+        } else {
+          // Fallback: show preview if path isn't available (shouldn't happen in Electron)
+          setSelectedFile(file);
+        }
       } else {
         addToast('Please drop a .torrent file', 'error');
       }
@@ -743,6 +755,30 @@ const DownloadsPage: React.FC<DownloadsPageProps> = ({
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [selectedIds, downloads, addToast]);
+
+  // Clipboard magnet detection — on window focus, check for magnet: URIs
+  useEffect(() => {
+    let lastDetectedMagnet = '';
+
+    const handleFocus = async () => {
+      try {
+        const text = await navigator.clipboard.readText();
+        if (text && text.startsWith('magnet:?') && text !== lastDetectedMagnet) {
+          lastDetectedMagnet = text;
+          addToast(
+            `Magnet link detected in clipboard`,
+            'info',
+            10000
+          );
+        }
+      } catch {
+        // Clipboard access denied — silently ignore
+      }
+    };
+
+    window.addEventListener('focus', handleFocus);
+    return () => window.removeEventListener('focus', handleFocus);
+  }, [addToast]);
 
   // Export downloads list
   const handleExport = useCallback((format: 'json' | 'csv') => {
@@ -901,6 +937,7 @@ const DownloadsPage: React.FC<DownloadsPageProps> = ({
   const handleFileSelectorCancel = () => {
     setShowFileSelector(false);
     setPendingTorrent(null);
+    setSelectedFile(null);
   };
 
   const handleClearSelection = () => {
@@ -909,16 +946,9 @@ const DownloadsPage: React.FC<DownloadsPageProps> = ({
 
   const handlePause = useCallback(async (id: string) => {
     try {
-      console.log('[handlePause] Pausing download:', id);
-
       await window.api.pauseDownload(id);
-      console.log('[handlePause] API call successful, reloading downloads');
-
-      await loadDownloads(); // Reload immediately
-
-      console.log('[handlePause] Downloads reloaded');
+      await loadDownloads();
     } catch (error) {
-      console.error('[handlePause] Error:', error);
       addToast(
         `Failed to pause: ${error instanceof Error ? error.message : String(error)}`,
         'error'

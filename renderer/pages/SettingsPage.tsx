@@ -9,6 +9,7 @@ import { AppSettings, SchedulerConfig, ScheduleEntry } from '../../shared/types'
 import {
   Button,
   Icon,
+  Select,
   Alert,
   ThemeSelector,
   SpeedPresets,
@@ -27,10 +28,13 @@ import {
 import { PrivacySettings } from '../components/PrivacySettings';
 import './SettingsPage.css';
 import { v4 as uuidv4 } from 'uuid';
+import { useTranslation } from '../utils/i18nContext';
 
 type Theme = 'light' | 'dark' | 'system';
 
 const SettingsPage: React.FC = () => {
+  const { t, language, setLanguage } = useTranslation();
+
   // Active category
   const [activeCategory, setActiveCategory] = useState('general');
 
@@ -57,6 +61,7 @@ const SettingsPage: React.FC = () => {
   const [autoUpdate, setAutoUpdate] = useState(true);
   const [minimizeToTray, setMinimizeToTray] = useState(false);
   const [closeToTray, setCloseToTray] = useState(false);
+  const [isDefaultClient, setIsDefaultClient] = useState(false);
 
   // Network settings
   const [maxDownKbps, setMaxDownKbps] = useState(0);
@@ -100,28 +105,31 @@ const SettingsPage: React.FC = () => {
   // Categories definition with semantic grouping
   const categories: SettingsCategory[] = [
     // Core Settings
-    { id: 'general', label: 'General', icon: 'settings', group: 'core' },
-    { id: 'downloads', label: 'Downloads', icon: 'download', group: 'core' },
-    { id: 'network', label: 'Network', icon: 'activity', group: 'core' },
+    { id: 'general', label: t('settings.general'), icon: 'settings', group: 'core' },
+    { id: 'downloads', label: t('settings.downloads'), icon: 'download', group: 'core' },
+    { id: 'network', label: t('settings.network'), icon: 'activity', group: 'core' },
     
     // Advanced
-    { id: 'advanced', label: 'Advanced', icon: 'layers', group: 'advanced' },
-    { id: 'scheduler', label: 'Scheduler', icon: 'calendar', group: 'advanced' },
-    { id: 'seeding', label: 'Collaborative Seeding', icon: 'share-2', group: 'advanced' },
+    { id: 'advanced', label: t('settings.advanced'), icon: 'layers', group: 'advanced' },
+    { id: 'scheduler', label: t('settings.scheduler'), icon: 'calendar', group: 'advanced' },
+    { id: 'seeding', label: t('settings.seeding'), icon: 'share-2', group: 'advanced' },
+
+    // Privacy & Security
+    { id: 'privacy', label: 'Privacy', icon: 'shield', group: 'security' },
 
     // Appearance
-    { id: 'interface', label: 'Interface', icon: 'sun', group: 'appearance' },
-    { id: 'notifications', label: 'Notifications', icon: 'bell', group: 'appearance' },
+    { id: 'interface', label: t('settings.interface'), icon: 'sun', group: 'appearance' },
+    { id: 'notifications', label: t('settings.notifications'), icon: 'bell', group: 'appearance' },
     
     // System
-    { id: 'system', label: 'System', icon: 'power', group: 'system' },
-    { id: 'hotkeys', label: 'Hotkeys', icon: 'keyboard', group: 'system' },
+    { id: 'system', label: t('settings.system'), icon: 'power', group: 'system' },
+    { id: 'hotkeys', label: t('settings.hotkeys'), icon: 'keyboard', group: 'system' },
     
     // Other
-    { id: 'about', label: 'About', icon: 'info', group: 'other' },
+    { id: 'about', label: t('settings.about'), icon: 'info', group: 'other' },
   ];
 
-  const dayNames = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'];
+  const dayNames = ['Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa', 'Su'];
 
   useEffect(() => {
     loadSettings();
@@ -144,6 +152,10 @@ const SettingsPage: React.FC = () => {
     } catch (error) {
       console.error('Failed to load hotkeys:', error);
     }
+    
+    // Load system settings not in standard settings object
+    window.api.getAutoLaunch().then(setAutoLaunch).catch(console.error);
+    window.api.isDefaultClient().then(setIsDefaultClient).catch(console.error);
   }, []);
 
   useEffect(() => {
@@ -159,10 +171,12 @@ const SettingsPage: React.FC = () => {
         defaultDownloadDir !== settings.defaultDownloadDir ||
         maxDownKbps !== settings.maxDownKbps ||
         maxUpKbps !== settings.maxUpKbps ||
-        maxActiveDownloads !== settings.maxActiveDownloads;
+        maxActiveDownloads !== settings.maxActiveDownloads ||
+        minimizeToTray !== (settings as any).minimizeToTray ||
+        closeToTray !== (settings as any).closeToTray;
       setHasChanges(changed);
     }
-  }, [settings, defaultDownloadDir, maxDownKbps, maxUpKbps, maxActiveDownloads]);
+  }, [settings, defaultDownloadDir, maxDownKbps, maxUpKbps, maxActiveDownloads, minimizeToTray, closeToTray]);
 
   const applyTheme = (selectedTheme: Theme) => {
     if (selectedTheme === 'system') {
@@ -187,6 +201,24 @@ const SettingsPage: React.FC = () => {
       setMaxDownKbps(s.maxDownKbps);
       setMaxUpKbps(s.maxUpKbps);
       setMaxActiveDownloads(s.maxActiveDownloads);
+      setMinimizeToTray(s.minimizeToTray ?? false);
+      setCloseToTray(s.closeToTray ?? false);
+
+      // Advanced settings
+      setEnableDHT(s.enableDHT ?? true);
+      setEnablePEX(s.enablePEX ?? true);
+      setEnableLSD(s.enableLSD ?? true);
+      setMaxConnections(s.maxConnections ?? 100);
+      setPortMin(s.portMin ?? 6881);
+      setPortMax(s.portMax ?? 6889);
+
+      // Proxy settings
+      setProxyEnabled(s.proxyEnabled ?? false);
+      setProxyType(s.proxyType ?? 'http');
+      setProxyHost(s.proxyHost ?? '');
+      setProxyPort(s.proxyPort ?? 8080);
+      setProxyUsername(s.proxyUsername ?? '');
+      setProxyPassword(s.proxyPassword ?? '');
 
       const scheduler = await window.api.getScheduler();
       setSchedulerConfig(scheduler);
@@ -201,15 +233,19 @@ const SettingsPage: React.FC = () => {
   };
 
   const loadStats = async () => {
-    // Mock stats - в реальном приложении получать через API
-    setStats({
-      totalDownloads: 42,
-      totalUploaded: '15.3 GB',
-      totalDownloaded: '47.8 GB',
-      cacheSize: '234 MB',
-      diskUsage: '47.8 GB',
-      uptime: '3h 24m',
-    });
+    try {
+      const realStats = await window.api.getAppStats();
+      setStats({
+        totalDownloads: realStats.totalDownloads,
+        totalUploaded: realStats.totalUploaded,
+        totalDownloaded: realStats.totalDownloaded,
+        cacheSize: '-',
+        diskUsage: realStats.diskUsage,
+        uptime: `${realStats.activeDownloads} active, ${realStats.completedDownloads} done`,
+      });
+    } catch (error) {
+      console.error('Failed to load stats:', error);
+    }
   };
 
   const handleSchedulerToggle = async () => {
@@ -217,7 +253,7 @@ const SettingsPage: React.FC = () => {
       const newEnabled = !schedulerEnabled;
       await window.api.updateScheduler({ enabled: newEnabled });
       setSchedulerEnabled(newEnabled);
-      setMessage({ type: 'success', text: newEnabled ? 'Планировщик включен' : 'Планировщик выключен' });
+      setMessage({ type: 'success', text: newEnabled ? 'Scheduler enabled' : 'Scheduler disabled' });
     } catch (error) {
       console.error('Failed to toggle scheduler:', error);
       setMessage({ type: 'error', text: 'Failed to toggle scheduler' });
@@ -263,7 +299,27 @@ const SettingsPage: React.FC = () => {
         maxDownKbps,
         maxUpKbps,
         maxActiveDownloads,
+        minimizeToTray,
+        closeToTray,
+        // Advanced
+        enableDHT,
+        enablePEX,
+        enableLSD,
+        maxConnections,
+        portMin,
+        portMax,
+        // Proxy
+        proxyEnabled,
+        proxyType,
+        proxyHost,
+        proxyPort,
+        proxyUsername,
+        proxyPassword,
       });
+
+      if (autoLaunch !== await window.api.getAutoLaunch()) {
+        await window.api.setAutoLaunch(autoLaunch);
+      }
 
       if (schedulerConfig) {
         await window.api.updateScheduler({
@@ -272,12 +328,12 @@ const SettingsPage: React.FC = () => {
         });
       }
 
-      setMessage({ type: 'success', text: 'Настройки успешно сохранены!' });
+      setMessage({ type: 'success', text: 'Settings saved successfully!' });
       setHasChanges(false);
       await loadSettings();
     } catch (error) {
       console.error('Failed to save settings:', error);
-      setMessage({ type: 'error', text: 'Не удалось сохранить настройки' });
+      setMessage({ type: 'error', text: 'Failed to save settings' });
     } finally {
       setSaving(false);
     }
@@ -300,12 +356,11 @@ const SettingsPage: React.FC = () => {
   const handleClearCache = async () => {
     setClearingCache(true);
     try {
-      // Mock - implement actual cache clearing later
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      setMessage({ type: 'success', text: 'Кеш успешно очищен!' });
+      await window.api.clearCache();
+      setMessage({ type: 'success', text: 'Cache cleared successfully!' });
     } catch (error) {
       console.error('Failed to clear cache:', error);
-      setMessage({ type: 'error', text: 'Не удалось очистить кеш' });
+      setMessage({ type: 'error', text: 'Failed to clear cache' });
     } finally {
       setClearingCache(false);
     }
@@ -316,16 +371,40 @@ const SettingsPage: React.FC = () => {
     setMaxUpKbps(upload);
   };
 
-  const handleNotificationChange = (notifSettings: {
-    enableNotifications: boolean;
-    enableSounds: boolean;
-    notifyOnComplete: boolean;
-    notifyOnError: boolean;
+  const handleSystemSettingsChange = async (systemSettings: {
+    autoLaunch: boolean;
+    autoUpdate: boolean;
+    minimizeToTray: boolean;
+    closeToTray: boolean;
   }) => {
-    setEnableNotifications(notifSettings.enableNotifications);
-    setEnableSounds(notifSettings.enableSounds);
-    setNotifyOnComplete(notifSettings.notifyOnComplete);
-    setNotifyOnError(notifSettings.notifyOnError);
+    if (systemSettings.autoLaunch !== autoLaunch) {
+      try {
+        await window.api.setAutoLaunch(systemSettings.autoLaunch);
+        setAutoLaunch(systemSettings.autoLaunch);
+      } catch (error) {
+        console.error('Failed to update auto launch:', error);
+        setMessage({ type: 'error', text: 'Failed to update auto launch setting' });
+      }
+    }
+    
+    setAutoUpdate(systemSettings.autoUpdate);
+    setMinimizeToTray(systemSettings.minimizeToTray);
+    setCloseToTray(systemSettings.closeToTray);
+  };
+
+  const handleSetDefaultClient = async () => {
+    try {
+      const result = await window.api.setDefaultClient();
+      if (result.success) {
+        setIsDefaultClient(true);
+        setMessage({ type: 'success', text: 'Set as default torrent client!' });
+      } else {
+        setMessage({ type: 'error', text: 'Failed to set as default client' });
+      }
+    } catch (error) {
+      console.error('Failed to set default client:', error);
+      setMessage({ type: 'error', text: 'Failed to set as default client' });
+    }
   };
 
   const handleHotkeyChange = (hotkeyId: string, keys: string[]) => {
@@ -350,7 +429,7 @@ const SettingsPage: React.FC = () => {
     });
     localStorage.setItem('hotkeys', JSON.stringify(hotkeysMap));
     
-    setMessage({ type: 'success', text: 'Горячие клавиши сброшены!' });
+    setMessage({ type: 'success', text: 'Hotkeys reset!' });
   };
 
   const handleProxyChange = (proxy: {
@@ -387,34 +466,47 @@ const SettingsPage: React.FC = () => {
 
   const handleExportSettings = async () => {
     try {
-      // Mock - implement actual export later
-      await new Promise(resolve => setTimeout(resolve, 500));
-      setMessage({ type: 'success', text: 'Настройки экспортированы!' });
+      const result = await window.api.exportSettings();
+      if (result.success) {
+        setMessage({ type: 'success', text: 'Settings exported!' });
+      }
     } catch (error) {
       console.error('Failed to export settings:', error);
-      setMessage({ type: 'error', text: 'Ошибка экспорта настроек' });
+      setMessage({ type: 'error', text: 'Failed to export settings' });
     }
   };
 
   const handleImportSettings = async () => {
     try {
-      // Mock - implement actual import later
-      await new Promise(resolve => setTimeout(resolve, 500));
-      await loadSettings();
-      setMessage({ type: 'success', text: 'Настройки импортированы!' });
+      const result = await window.api.importSettings();
+      if (result.success) {
+        await loadSettings();
+        setMessage({ type: 'success', text: 'Settings imported!' });
+      }
     } catch (error) {
       console.error('Failed to import settings:', error);
-      setMessage({ type: 'error', text: 'Ошибка импорта настроек' });
+      setMessage({ type: 'error', text: 'Failed to import settings' });
     }
   };
 
   const handleCheckForUpdates = async () => {
     try {
-      // Mock - implement actual update check later
-      await new Promise(resolve => setTimeout(resolve, 500));
-      setMessage({ type: 'success', text: 'Проверка обновлений запущена' });
+      setMessage({ type: 'success', text: 'Checking for updates...' });
+      const response = await fetch('https://api.github.com/repos/NIHILcoder/TorrentHunt/releases/latest');
+      if (!response.ok) {
+        setMessage({ type: 'error', text: 'Could not check for updates. Try again later.' });
+        return;
+      }
+      const release = await response.json();
+      const latestVersion = (release.tag_name || '').replace(/^v/, '');
+      const currentVersion = '1.1.0'; // from package.json
+      if (latestVersion && latestVersion !== currentVersion) {
+        setMessage({ type: 'success', text: `New version ${latestVersion} available! Visit GitHub to download.` });
+      } else {
+        setMessage({ type: 'success', text: 'You are on the latest version.' });
+      }
     } catch (error) {
-      console.error('Failed to check for updates:', error);
+      setMessage({ type: 'error', text: 'Failed to check for updates. Check your internet connection.' });
     }
   };
 
@@ -422,7 +514,7 @@ const SettingsPage: React.FC = () => {
     return (
       <div className="settings-page settings-loading">
         <Icon name="loader" size={32} />
-        <p>Загрузка настроек...</p>
+        <p>Loading settings...</p>
       </div>
     );
   }
@@ -474,10 +566,10 @@ const SettingsPage: React.FC = () => {
         {hasChanges && (
           <div className="settings-actions">
             <Button variant="secondary" onClick={handleReset}>
-              Отменить
+              Cancel
             </Button>
             <Button onClick={handleSave} loading={saving} disabled={saving}>
-              Сохранить изменения
+              Save Changes
             </Button>
           </div>
         )}
@@ -641,6 +733,83 @@ const SettingsPage: React.FC = () => {
         <div className="settings-notice-compact">
           <Icon name="info" size={14} />
           <span>Speed limiting is best-effort due to WebTorrent limitations</span>
+        </div>
+
+        <div className="settings-divider" />
+
+        <div className="settings-group">
+          <h3 className="settings-group-title">PROXY</h3>
+          {renderSettingItem(
+            'Enable Proxy',
+            'Route tracker requests through a proxy server',
+            renderToggle(proxyEnabled, () => setProxyEnabled(!proxyEnabled))
+          )}
+          {proxyEnabled && (
+            <>
+              {renderSettingItem(
+                'Proxy Type',
+                'Protocol for the proxy connection',
+                <select
+                  className="input-compact"
+                  value={proxyType}
+                  onChange={(e) => setProxyType(e.target.value as any)}
+                >
+                  <option value="http">HTTP</option>
+                  <option value="https">HTTPS</option>
+                  <option value="socks5">SOCKS5</option>
+                </select>
+              )}
+              {renderSettingItem(
+                'Proxy Host',
+                'Proxy server hostname or IP',
+                <input
+                  type="text"
+                  className="input-compact"
+                  placeholder="proxy.example.com"
+                  value={proxyHost}
+                  onChange={(e) => setProxyHost(e.target.value)}
+                />
+              )}
+              {renderSettingItem(
+                'Proxy Port',
+                'Proxy server port',
+                <input
+                  type="number"
+                  className="input-compact input-mono"
+                  min="1"
+                  max="65535"
+                  value={proxyPort}
+                  onChange={(e) => setProxyPort(parseInt(e.target.value) || 8080)}
+                />
+              )}
+              {renderSettingItem(
+                'Username',
+                'Proxy authentication username (optional)',
+                <input
+                  type="text"
+                  className="input-compact"
+                  placeholder="username"
+                  value={proxyUsername}
+                  onChange={(e) => setProxyUsername(e.target.value)}
+                />
+              )}
+              {renderSettingItem(
+                'Password',
+                'Proxy authentication password (optional)',
+                <input
+                  type="password"
+                  className="input-compact"
+                  placeholder="••••••"
+                  value={proxyPassword}
+                  onChange={(e) => setProxyPassword(e.target.value)}
+                />
+              )}
+              <div className="settings-notice-compact">
+                <Icon name="info" size={14} />
+                <span>Proxy applies to tracker requests only. Direct peer-to-peer UDP connections bypass the proxy.</span>
+              </div>
+            </>
+          )}
         </div>
       </>
     );
@@ -843,11 +1012,33 @@ const SettingsPage: React.FC = () => {
           <h3 className="settings-group-title">THEME</h3>
           <div className="setting-item">
             <div className="setting-info">
-              <div className="setting-label">Color Scheme</div>
-              <p className="setting-description">Choose your preferred theme</p>
+              <div className="setting-label">{t('settings.theme')}</div>
+              <p className="setting-description">{t('settings.theme.desc')}</p>
             </div>
             <div className="setting-control">
               <ThemeSelector currentTheme={theme} onThemeChange={handleThemeChange} />
+            </div>
+          </div>
+        </div>
+
+        <div className="settings-divider" />
+
+        <div className="settings-group">
+          <h3 className="settings-group-title">LANGUAGE</h3>
+          <div className="setting-item">
+            <div className="setting-info">
+              <div className="setting-label">{t('settings.language')}</div>
+              <p className="setting-description">{t('settings.language.desc')}</p>
+            </div>
+            <div className="setting-control" style={{ width: '150px' }}>
+              <Select 
+                options={[
+                  { value: 'en', label: 'English', icon: 'globe' },
+                  { value: 'ru', label: 'Русский', icon: 'globe' }
+                ]}
+                value={language}
+                onChange={(val) => setLanguage(val as 'en' | 'ru')}
+              />
             </div>
           </div>
         </div>
@@ -897,6 +1088,30 @@ const SettingsPage: React.FC = () => {
           <h1 className="settings-category-title">System Integration</h1>
           <p className="settings-category-subtitle">System-level settings and integration</p>
         </div>
+
+        <div className="settings-group">
+          <h3 className="settings-group-title">OS INTEGRATION</h3>
+          <div className="setting-item">
+            <div className="setting-info">
+              <div className="setting-label">Default Torrent Client</div>
+              <p className="setting-description">Open .torrent files and magnet links with TorrentHunt</p>
+            </div>
+            <div className="setting-control">
+              {isDefaultClient ? (
+                <span className="status-badge success" style={{ color: 'var(--color-success)', display: 'flex', alignItems: 'center', gap: '4px', fontSize: '13px' }}>
+                  <Icon name="check-circle" size={14} />
+                  Current Default
+                </span>
+              ) : (
+                <Button variant="secondary" onClick={handleSetDefaultClient}>
+                  Set as Default
+                </Button>
+              )}
+            </div>
+          </div>
+        </div>
+
+        <div className="settings-divider" />
 
         <div className="settings-group">
           <h3 className="settings-group-title">UPDATES</h3>

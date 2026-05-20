@@ -20,11 +20,11 @@ interface StoreSchema {
 }
 
 const defaultCategories: Category[] = [
-  { id: 'movies', name: 'Фильмы', icon: 'film', color: '#ef4444' },
-  { id: 'games', name: 'Игры', icon: 'gamepad-2', color: '#8b5cf6' },
-  { id: 'software', name: 'Софт', icon: 'package', color: '#3b82f6' },
-  { id: 'music', name: 'Музыка', icon: 'music', color: '#22c55e' },
-  { id: 'other', name: 'Другое', icon: 'folder', color: '#6b7280' },
+  { id: 'movies', name: 'Movies', icon: 'film', color: '#ef4444' },
+  { id: 'games', name: 'Games', icon: 'gamepad-2', color: '#8b5cf6' },
+  { id: 'software', name: 'Software', icon: 'package', color: '#3b82f6' },
+  { id: 'music', name: 'Music', icon: 'music', color: '#22c55e' },
+  { id: 'other', name: 'Other', icon: 'folder', color: '#6b7280' },
 ];
 
 const store = new Store<StoreSchema>({
@@ -36,6 +36,24 @@ const store = new Store<StoreSchema>({
       maxDownKbps: 0,
       maxUpKbps: 0,
       maxActiveDownloads: 3,
+      minimizeToTray: false,
+      closeToTray: false,
+      autoLaunch: false,
+      autoUpdate: false,
+      // Advanced
+      enableDHT: true,
+      enablePEX: true,
+      enableLSD: true,
+      maxConnections: 100,
+      portMin: 6881,
+      portMax: 6889,
+      // Proxy
+      proxyEnabled: false,
+      proxyType: 'http' as const,
+      proxyHost: '',
+      proxyPort: 8080,
+      proxyUsername: '',
+      proxyPassword: '',
       updatedAt: new Date(),
     },
     categories: defaultCategories,
@@ -66,6 +84,7 @@ export async function createDownload(data: {
   torrentFilePath?: string;
   savePath: string;
   status: 'queued' | 'downloading' | 'paused' | 'completed' | 'seeding' | 'error' | 'removed';
+  selectedFiles?: number[];
 }): Promise<Download> {
   const id = uuidv4();
   const now = new Date();
@@ -89,6 +108,7 @@ export async function createDownload(data: {
     seeds: 0,
     priority: 0,
     category: null,
+    selectedFiles: data.selectedFiles,
     createdAt: now,
     updatedAt: now,
     lastError: null,
@@ -148,6 +168,7 @@ export async function updateDownloadProgress(
     peers: number;
     seeds: number;
     name?: string;
+    totalSize?: number;
   }
 ): Promise<void> {
   const downloads = store.get('downloads');
@@ -169,6 +190,9 @@ export async function updateDownloadProgress(
 
   if (data.name) {
     download.name = data.name;
+  }
+  if (data.totalSize !== undefined && data.totalSize > 0) {
+    download.totalSize = data.totalSize;
   }
 
   downloads[id] = download;
@@ -286,6 +310,55 @@ export async function setDownloadCategory(id: string, category: string | null): 
   download.updatedAt = new Date();
   downloads[id] = download;
   store.set('downloads', downloads);
+}
+
+// === App Statistics (computed from real data) ===
+
+function formatBytesForStats(bytes: number): string {
+  if (bytes === 0) return '0 B';
+  const units = ['B', 'KB', 'MB', 'GB', 'TB'];
+  const k = 1024;
+  const i = Math.floor(Math.log(bytes) / Math.log(k));
+  return `${(bytes / Math.pow(k, i)).toFixed(1)} ${units[i]}`;
+}
+
+export async function getAppStatistics(): Promise<{
+  totalDownloads: number;
+  totalUploaded: string;
+  totalDownloaded: string;
+  diskUsage: string;
+  activeDownloads: number;
+  completedDownloads: number;
+}> {
+  const downloads = store.get('downloads');
+  const all = Object.values(downloads);
+
+  let totalUploadedBytes = 0;
+  let totalDownloadedBytes = 0;
+  let diskUsageBytes = 0;
+  let activeCount = 0;
+  let completedCount = 0;
+
+  for (const d of all) {
+    totalUploadedBytes += d.uploadedBytes || 0;
+    totalDownloadedBytes += d.downloadedBytes || 0;
+    if (d.status === 'completed' || d.status === 'seeding') {
+      diskUsageBytes += d.totalSize || 0;
+      completedCount++;
+    }
+    if (d.status === 'downloading') {
+      activeCount++;
+    }
+  }
+
+  return {
+    totalDownloads: all.length,
+    totalUploaded: formatBytesForStats(totalUploadedBytes),
+    totalDownloaded: formatBytesForStats(totalDownloadedBytes),
+    diskUsage: formatBytesForStats(diskUsageBytes),
+    activeDownloads: activeCount,
+    completedDownloads: completedCount,
+  };
 }
 
 // === Scheduler ===

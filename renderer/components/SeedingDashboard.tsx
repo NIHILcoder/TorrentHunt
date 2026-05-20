@@ -1,3 +1,4 @@
+
 /**
  * Seeding Dashboard Component
  *
@@ -77,17 +78,17 @@ export const SeedingDashboard: React.FC = () => {
   const formatTimeAgo = (timestamp: number): string => {
     const seconds = Math.floor((Date.now() - timestamp) / 1000);
 
-    if (seconds < 60) return 'только что';
-    if (seconds < 3600) return `${Math.floor(seconds / 60)} мин назад`;
-    if (seconds < 86400) return `${Math.floor(seconds / 3600)} ч назад`;
-    return `${Math.floor(seconds / 86400)} дн назад`;
+    if (seconds < 60) return 'just now';
+    if (seconds < 3600) return `${Math.floor(seconds / 60)}m ago`;
+    if (seconds < 86400) return `${Math.floor(seconds / 3600)}h ago`;
+    return `${Math.floor(seconds / 86400)}d ago`;
   };
 
   if (loading) {
     return (
       <div className="seeding-dashboard loading">
         <Icon name="loader" size={32} className="spinner" />
-        <p>Загрузка данных...</p>
+        <p>Loading data...</p>
       </div>
     );
   }
@@ -98,7 +99,7 @@ export const SeedingDashboard: React.FC = () => {
       <div className="dashboard-header">
         <h1>🌐 Collaborative Seeding Network</h1>
         <p className="dashboard-subtitle">
-          Зарабатывайте баллы за раздачу редких торрентов и помогайте сообществу
+          Earn points by seeding rare torrents and help the community
         </p>
 
         <div className="enable-toggle">
@@ -108,7 +109,7 @@ export const SeedingDashboard: React.FC = () => {
               checked={enabled}
               onChange={handleToggleEnabled}
             />
-            <span>Включить Collaborative Seeding</span>
+            <span>Enable Collaborative Seeding</span>
           </label>
         </div>
       </div>
@@ -116,17 +117,17 @@ export const SeedingDashboard: React.FC = () => {
       {/* Reputation Card */}
       <div className="reputation-card">
         <div className="reputation-header">
-          <h2>Ваша репутация</h2>
+          <h2>Your Reputation</h2>
           <div className="level-badge">
             <span className="level-number">{reputation?.level || 1}</span>
-            <span className="level-label">уровень</span>
+            <span className="level-label">level</span>
           </div>
         </div>
 
         <div className="reputation-stats">
           <div className="stat-item">
             <div className="stat-value">{reputation?.points.toFixed(0) || 0}</div>
-            <div className="stat-label">Баллов</div>
+            <div className="stat-label">Points</div>
           </div>
 
           <div className="stat-item">
@@ -136,19 +137,19 @@ export const SeedingDashboard: React.FC = () => {
 
           <div className="stat-item">
             <div className="stat-value">{formatBytes(reputation?.uploadedTotal || 0)}</div>
-            <div className="stat-label">Отдано</div>
+            <div className="stat-label">Uploaded</div>
           </div>
 
           <div className="stat-item">
             <div className="stat-value">{reputation?.rareTorrentsSeeded || 0}</div>
-            <div className="stat-label">Редких торрентов</div>
+            <div className="stat-label">Rare Torrents</div>
           </div>
         </div>
 
         {/* Level progress */}
         <div className="level-progress">
           <div className="progress-header">
-            <span>Прогресс до уровня {(reputation?.level || 1) + 1}</span>
+            <span>Progress to level {(reputation?.level || 1) + 1}</span>
             <span>{getLevelProgress().toFixed(0)}%</span>
           </div>
           <ProgressBar value={getLevelProgress()} />
@@ -156,7 +157,7 @@ export const SeedingDashboard: React.FC = () => {
 
         {/* Badges */}
         <div className="badges-section">
-          <h3>Достижения</h3>
+          <h3>Achievements</h3>
           <div className="badges-grid">
             {badges.map(badge => (
               <div
@@ -174,9 +175,9 @@ export const SeedingDashboard: React.FC = () => {
 
       {/* Seeding Recommendations */}
       <div className="recommendations-section">
-        <h2>💡 Рекомендуемое для раздачи</h2>
+        <h2>💡 Recommended for Seeding</h2>
         <p className="section-subtitle">
-          Эти торренты принесут вам больше всего баллов
+          These torrents will earn you the most points
         </p>
 
         {recommendations && recommendations.torrents.length > 0 ? (
@@ -187,7 +188,7 @@ export const SeedingDashboard: React.FC = () => {
                   <div className="rec-name">{rec.torrentName}</div>
                   <div className="rec-bounty">
                     <Icon name="star" size={16} />
-                    <span>+{rec.expectedBounty.toFixed(0)} баллов</span>
+                    <span>+{rec.expectedBounty.toFixed(0)} points</span>
                   </div>
                 </div>
 
@@ -195,11 +196,11 @@ export const SeedingDashboard: React.FC = () => {
 
                 <div className="rec-stats">
                   <div className="rec-stat">
-                    <span className="stat-label">Редкость:</span>
+                    <span className="stat-label">Rarity:</span>
                     <span className="stat-value">{rec.priority.rarity.toFixed(0)}/100</span>
                   </div>
                   <div className="rec-stat">
-                    <span className="stat-label">Спрос:</span>
+                    <span className="stat-label">Demand:</span>
                     <span className="stat-value">{rec.priority.demand.toFixed(0)}/100</span>
                   </div>
                 </div>
@@ -209,14 +210,14 @@ export const SeedingDashboard: React.FC = () => {
         ) : (
           <div className="empty-recommendations">
             <Icon name="inbox" size={48} />
-            <p>Завершите загрузку торрентов, чтобы получить рекомендации</p>
+            <p>Complete torrent downloads to get recommendations</p>
           </div>
         )}
       </div>
 
       {/* Recent Transactions */}
       <div className="transactions-section">
-        <h2>📜 Последние транзакции</h2>
+        <h2>📜 Recent Transactions</h2>
 
         {transactions.length > 0 ? (
           <div className="transactions-list">
@@ -230,9 +231,9 @@ export const SeedingDashboard: React.FC = () => {
                   <div className="tx-time">{formatTimeAgo(tx.timestamp)}</div>
                 </div>
                 <div className="tx-type">
-                  {tx.type === 'earn' && <span className="tx-badge tx-badge-earn">Заработано</span>}
-                  {tx.type === 'bonus' && <span className="tx-badge tx-badge-bonus">Бонус</span>}
-                  {tx.type === 'spend' && <span className="tx-badge tx-badge-spend">Потрачено</span>}
+                  {tx.type === 'earn' && <span className="tx-badge tx-badge-earn">Earned</span>}
+                  {tx.type === 'bonus' && <span className="tx-badge tx-badge-bonus">Bonus</span>}
+                  {tx.type === 'spend' && <span className="tx-badge tx-badge-spend">Spent</span>}
                 </div>
               </div>
             ))}
@@ -240,7 +241,7 @@ export const SeedingDashboard: React.FC = () => {
         ) : (
           <div className="empty-transactions">
             <Icon name="activity" size={48} />
-            <p>История транзакций пуста</p>
+            <p>Transaction history is empty</p>
           </div>
         )}
       </div>

@@ -25,15 +25,15 @@ export const SpeedPresets: React.FC<SpeedPresetsProps> = ({
   const presets: Preset[] = [
     {
       id: 'unlimited',
-      label: 'Без ограничений',
+      label: 'Unlimited',
       icon: 'zap',
-      description: 'Максимальная скорость',
+      description: 'Maximum speed',
       download: 0,
       upload: 0,
     },
     {
       id: 'turbo',
-      label: 'Турбо',
+      label: 'Turbo',
       icon: 'trending-up',
       description: '10 MB/s ↓ / 5 MB/s ↑',
       download: 10240,
@@ -41,7 +41,7 @@ export const SpeedPresets: React.FC<SpeedPresetsProps> = ({
     },
     {
       id: 'normal',
-      label: 'Нормальная',
+      label: 'Normal',
       icon: 'activity',
       description: '5 MB/s ↓ / 2 MB/s ↑',
       download: 5120,
@@ -49,7 +49,7 @@ export const SpeedPresets: React.FC<SpeedPresetsProps> = ({
     },
     {
       id: 'eco',
-      label: 'Эконом',
+      label: 'Economy',
       icon: 'shield',
       description: '1 MB/s ↓ / 512 KB/s ↑',
       download: 1024,
@@ -65,7 +65,7 @@ export const SpeedPresets: React.FC<SpeedPresetsProps> = ({
     <div className="speed-presets">
       <div className="speed-presets-label">
         <Icon name="gauge" size={16} />
-        <span>Быстрые пресеты</span>
+        <span>Quick Presets</span>
       </div>
       <div className="speed-presets-grid">
         {presets.map((preset) => (

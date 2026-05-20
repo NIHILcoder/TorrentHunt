@@ -7,6 +7,7 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Button, Icon, Input, ProgressBar, ToastContainer, FileTreeSelector, FileNode, QRCode, TrackerTemplates, MetadataPreview, BatchCreate } from '../components';
 import { CreateTorrentOptions, CreateTorrentProgress, CreateTorrentResult } from '../../shared/types';
+import { useTranslation } from '../utils/i18nContext';
 import './CreateTorrentPage.css';
 
 // Utility functions
@@ -65,6 +66,7 @@ interface CreatedTorrentHistory {
 }
 
 export const CreateTorrentPage: React.FC<CreateTorrentPageProps> = ({ onNavigateBack }) => {
+  const { t } = useTranslation();
   // Source selection
   const [sourceMode, setSourceMode] = useState<SourceMode>('folder');
   const [sourcePaths, setSourcePaths] = useState<string[]>([]);
@@ -561,9 +563,9 @@ export const CreateTorrentPage: React.FC<CreateTorrentPageProps> = ({ onNavigate
           <div className="page-title-wrapper">
             <h1 className="page-title">
               <Icon name="file-plus" size={24} />
-              Create Torrent
+              {t('create.title')}
             </h1>
-            <span className="page-subtitle">Create and share your own .torrent files</span>
+            <span className="page-subtitle">{t('create.subtitle')}</span>
           </div>
         </div>
         
@@ -689,14 +691,14 @@ export const CreateTorrentPage: React.FC<CreateTorrentPageProps> = ({ onNavigate
                     <div className="form-field">
                       <label className="field-label">
                         <Icon name="type" size={14} />
-                        Torrent Name
+                        {t('create.name')}
                       </label>
                       <input
                         type="text"
                         className="field-input"
                         value={name}
                         onChange={(e) => setName(e.target.value)}
-                        placeholder="Enter torrent name..."
+                        placeholder={t('create.name.placeholder')}
                       />
                       <p className="field-hint">Leave empty to use source folder/file name</p>
                     </div>
@@ -705,13 +707,13 @@ export const CreateTorrentPage: React.FC<CreateTorrentPageProps> = ({ onNavigate
                     <div className="form-field">
                       <label className="field-label">
                         <Icon name="file-text" size={14} />
-                        Description
+                        {t('create.comment')}
                       </label>
                       <textarea
                         className="field-textarea"
                         value={comment}
                         onChange={(e) => setComment(e.target.value)}
-                        placeholder="Optional description or notes..."
+                        placeholder={t('create.comment.placeholder')}
                         rows={3}
                       />
                     </div>
@@ -720,7 +722,7 @@ export const CreateTorrentPage: React.FC<CreateTorrentPageProps> = ({ onNavigate
                     <div className="toggle-group">
                       <label className="toggle-option">
                         <div className="toggle-info">
-                          <span className="toggle-name">Start seeding immediately</span>
+                          <span className="toggle-name">{t('create.startSeeding')}</span>
                           <span className="toggle-desc">Begin sharing after creation</span>
                         </div>
                         <div className="toggle-control">
@@ -735,7 +737,7 @@ export const CreateTorrentPage: React.FC<CreateTorrentPageProps> = ({ onNavigate
 
                       <label className="toggle-option">
                         <div className="toggle-info">
-                          <span className="toggle-name">Private torrent</span>
+                          <span className="toggle-name">{t('create.private')}</span>
                           <span className="toggle-desc">Disable DHT/PEX (for private trackers)</span>
                         </div>
                         <div className="toggle-control">
@@ -758,7 +760,7 @@ export const CreateTorrentPage: React.FC<CreateTorrentPageProps> = ({ onNavigate
                       <div className="field-header">
                         <label className="field-label">
                           <Icon name="server" size={14} />
-                          Announce Trackers
+                          {t('create.trackers')}
                         </label>
                         <span className="tracker-count">
                           {trackers.split('\n').filter(t => t.trim()).length} trackers
@@ -768,7 +770,7 @@ export const CreateTorrentPage: React.FC<CreateTorrentPageProps> = ({ onNavigate
                         className="field-textarea tracker-textarea"
                         value={trackers}
                         onChange={(e) => setTrackers(e.target.value)}
-                        placeholder="Enter tracker URLs, one per line..."
+                        placeholder={t('create.trackers.placeholder')}
                         rows={10}
                       />
                       <p className="field-hint">

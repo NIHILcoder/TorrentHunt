@@ -37,7 +37,7 @@ export const AdvancedSettings: React.FC<AdvancedSettingsProps> = ({
             DHT (Distributed Hash Table)
           </label>
           <p className="setting-description">
-            Позволяет находить пиры без трекера
+            Find peers without a tracker
           </p>
         </div>
         <div className="setting-control">
@@ -56,7 +56,7 @@ export const AdvancedSettings: React.FC<AdvancedSettingsProps> = ({
         <div className="setting-info">
           <label className="setting-label">PEX (Peer Exchange)</label>
           <p className="setting-description">
-            Обмен списками пиров с другими клиентами
+            Exchange peer lists with other clients
           </p>
         </div>
         <div className="setting-control">
@@ -75,7 +75,7 @@ export const AdvancedSettings: React.FC<AdvancedSettingsProps> = ({
         <div className="setting-info">
           <label className="setting-label">LSD (Local Service Discovery)</label>
           <p className="setting-description">
-            Поиск пиров в локальной сети
+            Discover peers on local network
           </p>
         </div>
         <div className="setting-control">
@@ -92,9 +92,9 @@ export const AdvancedSettings: React.FC<AdvancedSettingsProps> = ({
 
       <div className="setting-item">
         <div className="setting-info">
-          <label className="setting-label">Максимум соединений</label>
+          <label className="setting-label">Max Connections</label>
           <p className="setting-description">
-            Максимальное количество одновременных подключений к пирам
+            Maximum number of simultaneous peer connections
           </p>
         </div>
         <div className="setting-control">
@@ -114,11 +114,11 @@ export const AdvancedSettings: React.FC<AdvancedSettingsProps> = ({
       <div className="port-range">
         <label className="port-range-label">
           <Icon name="server" size={16} />
-          Диапазон портов для входящих подключений
+          Port range for incoming connections
         </label>
         <div className="port-range-inputs">
           <div className="port-field">
-            <label>От</label>
+            <label>From</label>
             <input
               type="number"
               className="input input-number"
@@ -130,7 +130,7 @@ export const AdvancedSettings: React.FC<AdvancedSettingsProps> = ({
           </div>
           <span className="port-separator">—</span>
           <div className="port-field">
-            <label>До</label>
+            <label>To</label>
             <input
               type="number"
               className="input input-number"

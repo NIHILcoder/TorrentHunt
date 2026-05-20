@@ -175,7 +175,7 @@ export const SpeedGraph: React.FC<SpeedGraphProps> = ({
             ctx.fillStyle = labelColor;
             ctx.font = '12px system-ui';
             ctx.textAlign = 'center';
-            ctx.fillText('Сбор данных...', width / 2, graphHeight / 2);
+            ctx.fillText('Collecting data...', width / 2, graphHeight / 2);
             return;
         }
 
@@ -185,7 +185,7 @@ export const SpeedGraph: React.FC<SpeedGraphProps> = ({
             ctx.fillStyle = labelColor;
             ctx.font = '12px system-ui';
             ctx.textAlign = 'center';
-            ctx.fillText('Нет активности', width / 2, graphHeight / 2);
+            ctx.fillText('No activity', width / 2, graphHeight / 2);
         }
 
         const drawLine = (data: number[], color: string, fillOpacity: number = 0.15) => {
@@ -300,10 +300,10 @@ export const SpeedGraph: React.FC<SpeedGraphProps> = ({
                 </div>
                 <div className="speed-graph-legend-inline">
                     <span className="legend-item download">
-                        <span className="legend-dot" /> Загрузка
+                        <span className="legend-dot" /> Download
                     </span>
                     <span className="legend-item upload">
-                        <span className="legend-dot" /> Раздача
+                        <span className="legend-dot" /> Upload
                     </span>
                 </div>
             </div>
@@ -326,11 +326,11 @@ export const SpeedGraph: React.FC<SpeedGraphProps> = ({
                         }}
                     >
                         <div className="tooltip-row download">
-                            <span className="tooltip-label">↓ Загрузка:</span>
+                            <span className="tooltip-label">↓ Download:</span>
                             <span className="tooltip-value">{formatSpeed(hoveredPoint.data.download)}</span>
                         </div>
                         <div className="tooltip-row upload">
-                            <span className="tooltip-label">↑ Раздача:</span>
+                            <span className="tooltip-label">↑ Upload:</span>
                             <span className="tooltip-value">{formatSpeed(hoveredPoint.data.upload)}</span>
                         </div>
                     </div>

@@ -56,6 +56,10 @@ const api: IpcApi = {
     return ipcRenderer.invoke('downloads:setCategory', id, category);
   },
 
+  getAppStats: () => {
+    return ipcRenderer.invoke('stats:getAppStats');
+  },
+
   // Settings
   getSettings: (): Promise<AppSettings> => {
     return ipcRenderer.invoke('settings:get');
@@ -231,6 +235,46 @@ const api: IpcApi = {
     }): Promise<{ canceled: boolean; filePath?: string }> => {
       return ipcRenderer.invoke('dialog:showSaveDialog', options);
     },
+  },
+
+  // System settings
+  setAutoLaunch: (enabled: boolean): Promise<{ success: boolean }> => {
+    return ipcRenderer.invoke('app:setAutoLaunch', enabled);
+  },
+
+  getAutoLaunch: (): Promise<boolean> => {
+    return ipcRenderer.invoke('app:getAutoLaunch');
+  },
+
+  // Default client
+  isDefaultClient: (): Promise<boolean> => {
+    return ipcRenderer.invoke('app:isDefaultClient');
+  },
+
+  setDefaultClient: (): Promise<{ success: boolean }> => {
+    return ipcRenderer.invoke('app:setDefaultClient');
+  },
+
+  // Settings export/import
+  exportSettings: (): Promise<{ success: boolean; path?: string }> => {
+    return ipcRenderer.invoke('settings:export');
+  },
+
+  importSettings: (): Promise<{ success: boolean }> => {
+    return ipcRenderer.invoke('settings:import');
+  },
+
+  // App events
+  onOpenTorrent: (callback: (torrentUri: string) => void): (() => void) => {
+    const handler = (_event: IpcRendererEvent, uri: string) => {
+      callback(uri);
+    };
+
+    ipcRenderer.on('app:openTorrent', handler);
+
+    return () => {
+      ipcRenderer.removeListener('app:openTorrent', handler);
+    };
   },
 };
 

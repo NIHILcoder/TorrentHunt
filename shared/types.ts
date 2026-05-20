@@ -30,6 +30,7 @@ export interface Download {
   totalSize: number; // Total size in bytes
   priority: number; // 0 = low, 1 = normal, 2 = high
   category: string | null; // Category ID
+  selectedFiles?: number[]; // Indices of files selected for download (persisted for resume)
   createdAt: Date;
   updatedAt: Date;
   lastError: string | null;
@@ -69,6 +70,24 @@ export interface AppSettings {
   maxDownKbps: number;
   maxUpKbps: number;
   maxActiveDownloads: number;
+  minimizeToTray: boolean;
+  closeToTray: boolean;
+  autoLaunch: boolean;
+  autoUpdate: boolean;
+  // Advanced network settings
+  enableDHT: boolean;
+  enablePEX: boolean;
+  enableLSD: boolean;
+  maxConnections: number;
+  portMin: number;
+  portMax: number;
+  // Proxy settings
+  proxyEnabled: boolean;
+  proxyType: 'http' | 'https' | 'socks5';
+  proxyHost: string;
+  proxyPort: number;
+  proxyUsername: string;
+  proxyPassword: string;
   updatedAt: Date;
 }
 
@@ -236,10 +255,26 @@ export interface IpcApi {
   getTorrentFiles: (id: string) => Promise<TorrentFile[]>;
   getTorrentInfo: (params: { torrentPath?: string; magnetUri?: string }) => Promise<TorrentInfo>;
   setDownloadCategory: (id: string, category: string | null) => Promise<void>;
+  getAppStats: () => Promise<{
+    totalDownloads: number;
+    totalUploaded: string;
+    totalDownloaded: string;
+    diskUsage: string;
+    activeDownloads: number;
+    completedDownloads: number;
+  }>;
 
   // Settings
   getSettings: () => Promise<AppSettings>;
   updateSettings: (settings: Partial<AppSettings>) => Promise<AppSettings>;
+  exportSettings: () => Promise<{ success: boolean; path?: string }>;
+  importSettings: () => Promise<{ success: boolean }>;
+
+  // System
+  getAutoLaunch: () => Promise<boolean>;
+  setAutoLaunch: (enabled: boolean) => Promise<{ success: boolean }>;
+  isDefaultClient: () => Promise<boolean>;
+  setDefaultClient: () => Promise<{ success: boolean }>;
 
   // Categories
   getCategories: () => Promise<Category[]>;
@@ -296,6 +331,9 @@ export interface IpcApi {
   getPrivacyConfig: () => Promise<PrivacyConfig>;
   updatePrivacyConfig: (updates: Partial<PrivacyConfig>) => Promise<PrivacyConfig>;
   clearAllData: () => Promise<{ success: boolean }>;
+
+  // App events
+  onOpenTorrent: (callback: (torrentUri: string) => void) => () => void;
 
   // Dialog API
   dialog: {

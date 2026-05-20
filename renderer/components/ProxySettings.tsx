@@ -34,10 +34,10 @@ export const ProxySettings: React.FC<ProxySettingsProps> = ({
         <div className="setting-info">
           <label className="setting-label">
             <Icon name="shield" size={16} />
-            Использовать прокси
+            Use Proxy
           </label>
           <p className="setting-description">
-            Направить весь трафик торрентов через прокси-сервер
+            Route all torrent traffic through a proxy server
           </p>
         </div>
         <div className="setting-control">
@@ -53,10 +53,9 @@ export const ProxySettings: React.FC<ProxySettingsProps> = ({
       {enabled && (
         <>
           <div className="setting-divider" />
-
           <div className="proxy-config">
             <div className="proxy-field">
-              <label className="proxy-label">Тип прокси</label>
+              <label className="proxy-label">Proxy Type</label>
               <select
                 className="proxy-select"
                 value={type}
@@ -79,7 +78,7 @@ export const ProxySettings: React.FC<ProxySettingsProps> = ({
 
             <div className="proxy-row">
               <div className="proxy-field flex-1">
-                <label className="proxy-label">Хост</label>
+                <label className="proxy-label">Host</label>
                 <input
                   type="text"
                   className="proxy-input"
@@ -91,7 +90,7 @@ export const ProxySettings: React.FC<ProxySettingsProps> = ({
                 />
               </div>
               <div className="proxy-field">
-                <label className="proxy-label">Порт</label>
+                <label className="proxy-label">Port</label>
                 <input
                   type="number"
                   className="proxy-input proxy-input-port"
@@ -114,11 +113,11 @@ export const ProxySettings: React.FC<ProxySettingsProps> = ({
             <div className="proxy-auth">
               <div className="proxy-auth-header">
                 <Icon name="lock" size={14} />
-                <span>Аутентификация (опционально)</span>
+                <span>Authentication (optional)</span>
               </div>
               <div className="proxy-row">
                 <div className="proxy-field flex-1">
-                  <label className="proxy-label">Имя пользователя</label>
+                  <label className="proxy-label">Username</label>
                   <input
                     type="text"
                     className="proxy-input"
@@ -130,7 +129,7 @@ export const ProxySettings: React.FC<ProxySettingsProps> = ({
                   />
                 </div>
                 <div className="proxy-field flex-1">
-                  <label className="proxy-label">Пароль</label>
+                  <label className="proxy-label">Password</label>
                   <input
                     type="password"
                     className="proxy-input"

@@ -30,7 +30,7 @@ export const NotificationSettings: React.FC<NotificationSettingsProps> = ({
       // Mock notification for now - implement actual API call later
       if (window.Notification && Notification.permission === 'granted') {
         new Notification('TorrentHunt', {
-          body: 'Это тестовое уведомление. Все работает! 🎉',
+          body: 'This is a test notification. Everything works! 🎉',
         });
       }
     } catch (error) {
@@ -46,10 +46,10 @@ export const NotificationSettings: React.FC<NotificationSettingsProps> = ({
         <div className="setting-info">
           <label className="setting-label">
             <Icon name="bell" size={16} />
-            Системные уведомления
+            System Notifications
           </label>
           <p className="setting-description">
-            Показывать уведомления Windows при завершении загрузок
+            Show Windows notifications when downloads complete
           </p>
         </div>
         <div className="setting-control">
@@ -75,9 +75,9 @@ export const NotificationSettings: React.FC<NotificationSettingsProps> = ({
 
           <div className="setting-item">
             <div className="setting-info">
-              <label className="setting-label">Звуковые уведомления</label>
+              <label className="setting-label">Sound Notifications</label>
               <p className="setting-description">
-                Воспроизводить звук при показе уведомлений
+                Play sound with notifications
               </p>
             </div>
             <div className="setting-control">
@@ -100,7 +100,7 @@ export const NotificationSettings: React.FC<NotificationSettingsProps> = ({
           <div className="setting-divider" />
 
           <div className="notification-events">
-            <div className="notification-events-label">Уведомлять о событиях:</div>
+            <div className="notification-events-label">Notify on events:</div>
             <div className="notification-event-item">
               <label className="notification-checkbox">
                 <input
@@ -120,7 +120,7 @@ export const NotificationSettings: React.FC<NotificationSettingsProps> = ({
                 </span>
                 <span className="checkbox-label">
                   <Icon name="check-circle" size={16} />
-                  Завершение загрузки
+                  Download Complete
                 </span>
               </label>
             </div>
@@ -143,7 +143,7 @@ export const NotificationSettings: React.FC<NotificationSettingsProps> = ({
                 </span>
                 <span className="checkbox-label">
                   <Icon name="alert-triangle" size={16} />
-                  Ошибки загрузки
+                  Download Errors
                 </span>
               </label>
             </div>
@@ -158,7 +158,7 @@ export const NotificationSettings: React.FC<NotificationSettingsProps> = ({
               disabled={testingNotification}
             >
               <Icon name="bell" size={16} />
-              {testingNotification ? 'Отправляется...' : 'Тестовое уведомление'}
+              {testingNotification ? 'Sending...' : 'Test Notification'}
             </button>
           </div>
         </>

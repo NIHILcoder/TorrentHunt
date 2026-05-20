@@ -11,6 +11,8 @@ interface SystemSettingsProps {
   onAutoUpdateChange: (enabled: boolean) => void;
   onMinimizeToTrayChange: (enabled: boolean) => void;
   onCloseToTrayChange: (enabled: boolean) => void;
+  isDefaultClient: boolean;
+  onSetDefaultClient: () => void;
   onCheckForUpdates: () => void;
 }
 
@@ -23,6 +25,8 @@ export const SystemSettings: React.FC<SystemSettingsProps> = ({
   onAutoUpdateChange,
   onMinimizeToTrayChange,
   onCloseToTrayChange,
+  isDefaultClient,
+  onSetDefaultClient,
   onCheckForUpdates,
 }) => {
   return (
@@ -31,10 +35,10 @@ export const SystemSettings: React.FC<SystemSettingsProps> = ({
         <div className="setting-info">
           <label className="setting-label">
             <Icon name="power" size={16} />
-            Автозапуск с Windows
+            Auto Launch with Windows
           </label>
           <p className="setting-description">
-            Автоматически запускать TorrentHunt при входе в систему
+            Automatically start TorrentHunt when you log in
           </p>
         </div>
         <div className="setting-control">
@@ -53,10 +57,10 @@ export const SystemSettings: React.FC<SystemSettingsProps> = ({
         <div className="setting-info">
           <label className="setting-label">
             <Icon name="download-cloud" size={16} />
-            Автоматические обновления
+            Automatic Updates
           </label>
           <p className="setting-description">
-            Автоматически загружать и устанавливать обновления приложения
+            Automatically download and install app updates
           </p>
         </div>
         <div className="setting-control">
@@ -73,9 +77,9 @@ export const SystemSettings: React.FC<SystemSettingsProps> = ({
 
       <div className="setting-item">
         <div className="setting-info">
-          <label className="setting-label">Свернуть в трей</label>
+          <label className="setting-label">Minimize to Tray</label>
           <p className="setting-description">
-            Сворачивать приложение в системный трей вместо панели задач
+            Minimize app to system tray instead of taskbar
           </p>
         </div>
         <div className="setting-control">
@@ -92,9 +96,9 @@ export const SystemSettings: React.FC<SystemSettingsProps> = ({
 
       <div className="setting-item">
         <div className="setting-info">
-          <label className="setting-label">Закрыть в трей</label>
+          <label className="setting-label">Close to Tray</label>
           <p className="setting-description">
-            При закрытии окна сворачивать приложение в трей вместо выхода
+            Hide window to tray instead of quitting when closing
           </p>
         </div>
         <div className="setting-control">
@@ -109,12 +113,38 @@ export const SystemSettings: React.FC<SystemSettingsProps> = ({
 
       <div className="setting-divider" />
 
+      <div className="setting-item">
+        <div className="setting-info">
+          <label className="setting-label">
+            <Icon name="link" size={16} />
+            Default Torrent Client
+          </label>
+          <p className="setting-description">
+            Open .torrent files and magnet links with TorrentHunt
+          </p>
+        </div>
+        <div className="setting-control">
+          {isDefaultClient ? (
+            <span className="status-badge success" style={{ color: 'var(--color-success)', display: 'flex', alignItems: 'center', gap: '4px', fontSize: '13px' }}>
+              <Icon name="check-circle" size={14} />
+              Current Default
+            </span>
+          ) : (
+            <button className="btn btn-secondary btn-sm" onClick={onSetDefaultClient}>
+              Set as Default
+            </button>
+          )}
+        </div>
+      </div>
+
+      <div className="setting-divider" />
+
       <div className="update-check">
         <button className="btn-check-updates" onClick={onCheckForUpdates}>
           <Icon name="refresh-cw" size={16} />
-          Проверить обновления
+          Check for Updates
         </button>
-        <p className="update-info">Последняя проверка: сегодня в 12:34</p>
+        <p className="update-info">Last checked: today at 12:34</p>
       </div>
     </div>
   );

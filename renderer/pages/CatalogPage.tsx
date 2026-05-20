@@ -7,9 +7,11 @@
 import React, { useState, useEffect } from 'react';
 import { CatalogEntry } from '../../shared/types';
 import { Button, Icon, Alert, EmptyState, Badge } from '../components';
+import { useTranslation } from '../utils/i18nContext';
 import './CatalogPage.css';
 
 const CatalogPage: React.FC = () => {
+  const { t } = useTranslation();
   const [catalog, setCatalog] = useState<CatalogEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
@@ -102,7 +104,7 @@ const CatalogPage: React.FC = () => {
   return (
     <>
       <div className="page-header">
-        <h1 className="page-title">OSS Catalog</h1>
+        <h1 className="page-title">{t('catalog.title')}</h1>
       </div>
 
       <div className="page-content">
@@ -112,7 +114,7 @@ const CatalogPage: React.FC = () => {
             <Icon name="search" size={18} />
             <input
               type="text"
-              placeholder="Search software..."
+              placeholder={t('catalog.search')}
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="catalog-search-input"
@@ -124,7 +126,7 @@ const CatalogPage: React.FC = () => {
               className={`category-chip ${selectedCategory === null ? 'active' : ''}`}
               onClick={() => setSelectedCategory(null)}
             >
-              All
+              {t('catalog.category.all')}
             </button>
             {categories.map((cat) => (
               <button
@@ -179,7 +181,7 @@ const CatalogPage: React.FC = () => {
                           loading={downloading.has(entry.id)}
                           disabled={downloading.has(entry.id)}
                         >
-                          Download
+                          {t('catalog.add')}
                         </Button>
                       </div>
                     </div>

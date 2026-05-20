@@ -6,6 +6,7 @@
 
 import React, { useState } from 'react';
 import { Icon, IconName } from '../components';
+import { useTranslation } from '../utils/i18nContext';
 
 export type PageId = 'downloads' | 'catalog' | 'settings' | 'create-torrent';
 export type FilterMode = 'all' | 'downloading' | 'completed' | 'paused' | 'error';
@@ -49,20 +50,21 @@ export const Sidebar: React.FC<SidebarProps> = ({
   downloadCounts,
   activeDownloads = 0,
 }) => {
+  const { t } = useTranslation();
   const [isDownloadsExpanded, setIsDownloadsExpanded] = useState(currentPage === 'downloads');
 
   const navItems: NavItem[] = [
-    { id: 'downloads', label: 'Downloads', icon: 'download', hasSubmenu: true },
-    { id: 'catalog', label: 'Catalog', icon: 'book-open' },
-    { id: 'settings', label: 'Settings', icon: 'settings' },
+    { id: 'downloads', label: t('nav.downloads'), icon: 'download', hasSubmenu: true },
+    { id: 'catalog', label: t('nav.catalog'), icon: 'book-open' },
+    { id: 'settings', label: t('nav.settings'), icon: 'settings' },
   ];
 
   const filterItems: FilterItem[] = [
-    { id: 'all', label: 'All', icon: 'list' },
-    { id: 'downloading', label: 'Downloading', icon: 'download', colorClass: 'downloading' },
-    { id: 'completed', label: 'Completed', icon: 'check-circle', colorClass: 'completed' },
-    { id: 'paused', label: 'Paused', icon: 'pause', colorClass: 'paused' },
-    { id: 'error', label: 'Error', icon: 'alert-triangle', colorClass: 'error' },
+    { id: 'all', label: t('filter.all'), icon: 'list' },
+    { id: 'downloading', label: t('filter.downloading'), icon: 'download', colorClass: 'downloading' },
+    { id: 'completed', label: t('filter.completed'), icon: 'check-circle', colorClass: 'completed' },
+    { id: 'paused', label: t('filter.paused'), icon: 'pause', colorClass: 'paused' },
+    { id: 'error', label: t('filter.error'), icon: 'alert-triangle', colorClass: 'error' },
   ];
 
   const handleNavClick = (item: NavItem) => {
@@ -96,7 +98,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
       {/* Navigation */}
       <nav className="sidebar-nav">
         <div className="nav-section">
-          <div className="nav-section-title">Menu</div>
+          <div className="nav-section-title">{t('nav.menu')}</div>
           {navItems.map((item) => (
             <React.Fragment key={item.id}>
               <button
@@ -154,16 +156,15 @@ export const Sidebar: React.FC<SidebarProps> = ({
             <span className="sidebar-action-icon">
               <Icon name="file-plus" size={20} />
             </span>
-            <span className="sidebar-action-text">Create Torrent</span>
+            <span className="sidebar-action-text">{t('nav.create')}</span>
             <span className="sidebar-action-arrow">
               <Icon name="arrow-right" size={14} />
             </span>
           </button>
         </div>
         
-        {/* Version */}
         <div className="sidebar-version">
-          TorrentHunt v1.0.0
+          TorrentHunt v1.1.0
         </div>
       </div>
     </aside>

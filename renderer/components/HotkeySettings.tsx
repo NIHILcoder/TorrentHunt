@@ -67,13 +67,13 @@ export const HotkeySettings: React.FC<HotkeySettingsProps> = ({
 
     const keys: string[] = [];
     
-    // Добавляем модификаторы
+    // Add modifiers
     if (e.ctrlKey) keys.push('Ctrl');
     if (e.shiftKey) keys.push('Shift');
     if (e.altKey) keys.push('Alt');
     if (e.metaKey) keys.push('Meta');
 
-    // Используем event.code для независимости от раскладки
+    // Use event.code for keyboard layout independence
     const code = e.code;
     if (code && !['ControlLeft', 'ControlRight', 'ShiftLeft', 'ShiftRight', 'AltLeft', 'AltRight', 'MetaLeft', 'MetaRight'].includes(code)) {
       keys.push(code);
@@ -82,7 +82,7 @@ export const HotkeySettings: React.FC<HotkeySettingsProps> = ({
     if (keys.length > 0) {
       setRecordedKeys(keys);
       
-      // Сразу сохраняем если есть хотя бы одна не-модификаторная клавиша
+      // Save immediately if there's at least one non-modifier key
       const hasMainKey = keys.some(k => !['Ctrl', 'Shift', 'Alt', 'Meta'].includes(k));
       if (hasMainKey && editingHotkey) {
         onHotkeyChange(editingHotkey, keys);
@@ -94,7 +94,7 @@ export const HotkeySettings: React.FC<HotkeySettingsProps> = ({
   };
 
   const handleKeyUp = (e: React.KeyboardEvent) => {
-    // Теперь не нужен, так как сохраняем в handleKeyDown
+    // No longer needed since we save in handleKeyDown
     e.preventDefault();
     e.stopPropagation();
   };
@@ -111,13 +111,13 @@ export const HotkeySettings: React.FC<HotkeySettingsProps> = ({
         <div className="hotkey-header-info">
           <Icon name="keyboard" size={20} />
           <div>
-            <h3>Горячие клавиши</h3>
-            <p>Настройте комбинации клавиш для быстрого доступа к функциям</p>
+            <h3>Keyboard Shortcuts</h3>
+            <p>Customize key combinations for quick access to features</p>
           </div>
         </div>
         <button className="btn-reset-hotkeys" onClick={onResetHotkeys}>
           <Icon name="rotate-ccw" size={16} />
-          Сбросить все
+          Reset All
         </button>
       </div>
 
@@ -145,7 +145,7 @@ export const HotkeySettings: React.FC<HotkeySettingsProps> = ({
                         <span className="hotkey-recorder-text">
                           {recordedKeys.length > 0
                             ? recordedKeys.map(k => codeToDisplayName(k)).join(' + ')
-                            : 'Нажмите клавиши...'}
+                            : 'Press keys...'}
                         </span>
                         <button className="btn-cancel-recording" onClick={handleCancel}>
                           <Icon name="x" size={14} />
@@ -166,7 +166,7 @@ export const HotkeySettings: React.FC<HotkeySettingsProps> = ({
                             ))}
                           </span>
                         ) : (
-                          <span className="hotkey-empty">Не назначено</span>
+                          <span className="hotkey-empty">Not Assigned</span>
                         )}
                         <Icon name="edit-2" size={14} />
                       </button>
@@ -185,51 +185,51 @@ export const HotkeySettings: React.FC<HotkeySettingsProps> = ({
 export const defaultHotkeys: Hotkey[] = [
   {
     id: 'open-downloads',
-    label: 'Открыть загрузки',
-    description: 'Переключиться на страницу загрузок',
+    label: 'Open Downloads',
+    description: 'Switch to the downloads page',
     keys: ['Ctrl', 'KeyD'],
-    category: 'Навигация',
+    category: 'Navigation',
   },
   {
     id: 'open-catalog',
-    label: 'Открыть каталог',
-    description: 'Переключиться на страницу каталога',
+    label: 'Open Catalog',
+    description: 'Switch to the catalog page',
     keys: ['Ctrl', 'KeyK'],
-    category: 'Навигация',
+    category: 'Navigation',
   },
   {
     id: 'open-settings',
-    label: 'Открыть настройки',
-    description: 'Открыть страницу настроек',
+    label: 'Open Settings',
+    description: 'Open the settings page',
     keys: ['Ctrl', 'Comma'],
-    category: 'Навигация',
+    category: 'Navigation',
   },
   {
     id: 'add-torrent',
-    label: 'Добавить торрент',
-    description: 'Открыть диалог добавления торрента',
+    label: 'Add Torrent',
+    description: 'Open the add torrent dialog',
     keys: ['Ctrl', 'KeyO'],
-    category: 'Торренты',
+    category: 'Torrents',
   },
   {
     id: 'create-torrent',
-    label: 'Создать торрент',
-    description: 'Перейти к созданию торрента',
+    label: 'Create Torrent',
+    description: 'Navigate to torrent creation',
     keys: ['Ctrl', 'KeyN'],
-    category: 'Торренты',
+    category: 'Torrents',
   },
   {
     id: 'pause-all',
-    label: 'Приостановить все',
-    description: 'Приостановить все активные загрузки',
+    label: 'Pause All',
+    description: 'Pause all active downloads',
     keys: ['Ctrl', 'Shift', 'KeyP'],
-    category: 'Торренты',
+    category: 'Torrents',
   },
   {
     id: 'resume-all',
-    label: 'Возобновить все',
-    description: 'Возобновить все приостановленные загрузки',
+    label: 'Resume All',
+    description: 'Resume all paused downloads',
     keys: ['Ctrl', 'Shift', 'KeyR'],
-    category: 'Торренты',
+    category: 'Torrents',
   },
 ];

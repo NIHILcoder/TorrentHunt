@@ -1,7 +1,7 @@
 {
   "name": "torrenthunt",
-  "version": "1.0.0",
-  "description": "Desktop torrent client for legal open-source software",
+  "version": "1.1.0",
+  "description": "A modern, agent-built BitTorrent client",
   "main": "dist/electron/electron/main.js",
   "scripts": {
     "dev": "concurrently \"npm run dev:electron\" \"npm run dev:renderer\"",
@@ -14,14 +14,10 @@
     "typecheck:electron": "tsc -p tsconfig.electron.json --noEmit",
     "typecheck:renderer": "tsc -p tsconfig.renderer.json --noEmit",
     "lint": "eslint \"electron/**/*.ts\" \"renderer/**/*.{ts,tsx}\" \"shared/**/*.ts\"",
-    "migrate": "node-pg-migrate -m migrations",
-    "migrate:up": "npm run migrate up",
-    "migrate:down": "npm run migrate down",
     "start": "npm run build && electron .",
     "dist": "npm run build && electron-builder --win"
   },
   "dependencies": {
-    "@headlessui/react": "^1.7.18",
     "@hookform/resolvers": "^3.3.4",
     "@tanstack/react-virtual": "^3.0.4",
     "@types/webtorrent": "^0.109.7",
@@ -29,7 +25,6 @@
     "dotenv": "^16.3.1",
     "electron-store": "^8.1.0",
     "framer-motion": "^11.0.3",
-    "puppeteer": "^21.6.0",
     "rc-slider": "^10.5.0",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
@@ -48,7 +43,6 @@
   },
   "devDependencies": {
     "@types/node": "^20.10.0",
-    "@types/pg": "^8.10.9",
     "@types/react": "^18.2.42",
     "@types/react-dom": "^18.2.17",
     "@types/uuid": "^9.0.7",
@@ -59,9 +53,6 @@
     "electron": "^28.0.0",
     "eslint": "^8.55.0",
     "html-webpack-plugin": "^5.5.4",
-    "node-pg-migrate": "^6.2.2",
-    "react": "^18.2.0",
-    "react-dom": "^18.2.0",
     "style-loader": "^3.3.3",
     "ts-loader": "^9.5.1",
     "ts-node": "^10.9.2",
@@ -75,7 +66,8 @@
     "appId": "com.torrenthunt.app",
     "productName": "TorrentHunt",
     "directories": {
-      "output": "release"
+      "output": "release",
+      "buildResources": "build"
     },
     "files": [
       "dist/**/*",
@@ -89,14 +81,17 @@
             "x64"
           ]
         }
-      ]
+      ],
+      "icon": "build/icon.png"
     },
     "nsis": {
       "oneClick": false,
       "allowToChangeInstallationDirectory": true,
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
-      "shortcutName": "TorrentHunt"
+      "shortcutName": "TorrentHunt",
+      "include": "build/installer.nsh",
+      "runAfterFinish": true
     }
   },
   "author": "",

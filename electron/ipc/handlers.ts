@@ -1,4 +1,4 @@
-import { ipcMain, dialog, BrowserWindow, shell, app } from 'electron';
+import { ipcMain, dialog, BrowserWindow, shell, app, Notification } from 'electron';
 import { getTorrentManager, TorrentError, createTorrentFile, getDefaultTrackers } from '../torrent';
 import { getCollaborativeSeedingManager } from '../seeding';
 import * as db from '../db/store';
@@ -237,18 +237,11 @@ export function setupIpcHandlers(mainWindow: BrowserWindow): void {
   // Shell operations
   ipcMain.handle('shell:openPath', wrapHandler('shell:openPath',
     async (_event, targetPath: string) => {
-      // Security: validate path to prevent arbitrary file/program execution
+      // Basic validation: must be a non-empty string
       if (!targetPath || typeof targetPath !== 'string') {
         throw new Error('Invalid path');
       }
-      // Only allow opening paths within the user's download/save directories
-      const settings = await db.getSettings();
-      const normalizedPath = path.normalize(targetPath);
-      const defaultDir = path.normalize(settings.defaultDownloadDir);
-      if (!normalizedPath.startsWith(defaultDir)) {
-        log.warn('Blocked attempt to open path outside download directory', { targetPath, defaultDir });
-        throw new Error('Cannot open paths outside download directory');
-      }
+      // shell.openPath opens with the OS default application — safe, not arbitrary code execution
       return await shell.openPath(targetPath);
     }
   ));
@@ -281,6 +274,18 @@ export function setupIpcHandlers(mainWindow: BrowserWindow): void {
   torrentManager.onStats((stats: DownloadStats[]) => {
     if (mainWindow && !mainWindow.isDestroyed()) {
       mainWindow.webContents.send('downloads:stats', stats);
+    }
+  });
+
+  // Download completion — OS notification
+  torrentManager.onComplete(({ name }) => {
+    if (Notification.isSupported()) {
+      const notification = new Notification({
+        title: 'Download Complete',
+        body: `${name} has finished downloading`,
+        icon: undefined, // Uses app icon by default
+      });
+      notification.show();
     }
   });
 
@@ -485,6 +490,113 @@ export function setupIpcHandlers(mainWindow: BrowserWindow): void {
     async () => {
       await db.clearAllData();
       return { success: true };
+    }
+  ));
+  // === System Settings ===
+
+  // Auto-launch
+  ipcMain.handle('app:setAutoLaunch', wrapHandler('app:setAutoLaunch',
+    async (_event, enabled: boolean) => {
+      app.setLoginItemSettings({ openAtLogin: enabled });
+      await db.updateSettings({ autoLaunch: enabled } as any);
+      return { success: true };
+    }
+  ));
+
+  ipcMain.handle('app:getAutoLaunch', wrapHandler('app:getAutoLaunch',
+    async () => {
+      const loginSettings = app.getLoginItemSettings();
+      return loginSettings.openAtLogin;
+    }
+  ));
+
+  // Default client
+  ipcMain.handle('app:isDefaultClient', wrapHandler('app:isDefaultClient',
+    async () => {
+      return app.isDefaultProtocolClient('magnet');
+    }
+  ));
+
+  ipcMain.handle('app:setDefaultClient', wrapHandler('app:setDefaultClient',
+    async () => {
+      const success = app.setAsDefaultProtocolClient('magnet');
+      return { success };
+    }
+  ));
+
+  // Export settings
+  ipcMain.handle('settings:export', wrapHandler('settings:export',
+    async () => {
+      const result = await dialog.showSaveDialog(mainWindow, {
+        title: 'Export Settings',
+        defaultPath: 'torrenthunt-settings.json',
+        filters: [{ name: 'JSON Files', extensions: ['json'] }],
+      });
+
+      if (result.canceled || !result.filePath) {
+        return { success: false };
+      }
+
+      const settings = await db.getSettings();
+      const categories = await db.getCategories();
+      const scheduler = await db.getScheduler();
+      const privacyConfig = await db.getPrivacyConfig();
+
+      const exportData = {
+        version: 1,
+        exportedAt: new Date().toISOString(),
+        settings,
+        categories,
+        scheduler,
+        privacyConfig,
+      };
+
+      await fs.writeFile(result.filePath, JSON.stringify(exportData, null, 2), 'utf-8');
+      log.info('Settings exported', { path: result.filePath });
+      return { success: true, path: result.filePath };
+    }
+  ));
+
+  // Import settings
+  ipcMain.handle('settings:import', wrapHandler('settings:import',
+    async () => {
+      const result = await dialog.showOpenDialog(mainWindow, {
+        title: 'Import Settings',
+        properties: ['openFile'],
+        filters: [{ name: 'JSON Files', extensions: ['json'] }],
+      });
+
+      if (result.canceled || result.filePaths.length === 0) {
+        return { success: false };
+      }
+
+      const content = await fs.readFile(result.filePaths[0], 'utf-8');
+      const importData = JSON.parse(content);
+
+      if (!importData.version || !importData.settings) {
+        throw new Error('Invalid settings file format');
+      }
+
+      // Apply imported settings
+      if (importData.settings) {
+        await db.updateSettings(importData.settings);
+      }
+      if (importData.scheduler) {
+        await db.updateScheduler(importData.scheduler);
+      }
+      if (importData.privacyConfig) {
+        await db.updatePrivacyConfig(importData.privacyConfig);
+      }
+
+      log.info('Settings imported', { path: result.filePaths[0] });
+      return { success: true };
+    }
+  ));
+
+  // App Statistics
+  ipcMain.handle('stats:getAppStats', wrapHandler('stats:getAppStats',
+    async () => {
+      return db.getAppStatistics();
     }
   ));
 

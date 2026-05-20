@@ -60,9 +60,12 @@ export const PrivacySettings: React.FC = () => {
   }, []);
 
   const loadPrivacySettings = async () => {
-    // Load from store
-    // const settings = await window.api.getPrivacySettings();
-    // setConfig(settings);
+    try {
+      const settings = await window.api.getPrivacyConfig();
+      setConfig(settings);
+    } catch (error) {
+      console.error('Failed to load privacy settings:', error);
+    }
   };
 
   const checkVPNStatus = async () => {
@@ -83,8 +86,13 @@ export const PrivacySettings: React.FC = () => {
     const newConfig = { ...config, [key]: value };
     setConfig(newConfig);
 
-    // Save to backend
-    // await window.api.updatePrivacySettings(newConfig);
+    try {
+      await window.api.updatePrivacyConfig({ [key]: value });
+    } catch (error) {
+      console.error('Failed to save privacy setting:', error);
+      // Revert on failure
+      setConfig(config);
+    }
   };
 
   const handleClearAllData = async () => {

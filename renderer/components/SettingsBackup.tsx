@@ -15,12 +15,12 @@ export const SettingsBackup: React.FC<SettingsBackupProps> = ({ onExport, onImpo
           <Icon name="upload-cloud" size={32} />
         </div>
         <div className="backup-info">
-          <h3>Экспорт настроек</h3>
-          <p>Сохранить все настройки в файл для резервной копии или переноса на другой компьютер</p>
+          <h3>Export Settings</h3>
+          <p>Save all settings to a file for backup or transfer to another computer</p>
         </div>
         <button className="btn-backup" onClick={onExport}>
           <Icon name="upload" size={16} />
-          Экспортировать
+          Export
         </button>
       </div>
 
@@ -29,19 +29,19 @@ export const SettingsBackup: React.FC<SettingsBackupProps> = ({ onExport, onImpo
           <Icon name="download-cloud" size={32} />
         </div>
         <div className="backup-info">
-          <h3>Импорт настроек</h3>
-          <p>Восстановить настройки из ранее сохраненного файла</p>
+          <h3>Import Settings</h3>
+          <p>Restore settings from a previously saved file</p>
         </div>
         <button className="btn-backup secondary" onClick={onImport}>
           <Icon name="download" size={16} />
-          Импортировать
+          Import
         </button>
       </div>
 
       <div className="backup-notice">
         <Icon name="info" size={16} />
         <span>
-          Экспорт включает: настройки приложения, горячие клавиши, темы, но не включает торренты и их данные.
+          Export includes: app settings, hotkeys, themes, but does not include torrents and their data.
         </span>
       </div>
     </div>

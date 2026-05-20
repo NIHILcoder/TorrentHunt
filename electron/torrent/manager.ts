@@ -30,6 +30,7 @@ interface ManagedTorrent {
 }
 
 type StatsCallback = (stats: DownloadStats[]) => void;
+type CompletionCallback = (info: { id: string; name: string }) => void;
 
 /**
  * Error class for torrent operation failures
@@ -62,6 +63,7 @@ export class TorrentManager {
     private addingTorrents: Set<string> = new Set(); // infoHashes being added (to prevent race conditions)
   private statsInterval: NodeJS.Timeout | null = null;
   private statsCallbacks: Set<StatsCallback> = new Set();
+  private completionCallbacks: Set<CompletionCallback> = new Set();
   private maxActiveDownloads = 3;
   private maxDownKbps = 0;
   private maxUpKbps = 0;
@@ -87,37 +89,58 @@ export class TorrentManager {
     this.maxActiveDownloads = settings.maxActiveDownloads;
     this.maxDownKbps = settings.maxDownKbps;
     this.maxUpKbps = settings.maxUpKbps;
-    
+
     log.debug('Settings loaded', {
       maxActiveDownloads: this.maxActiveDownloads,
       maxDownKbps: this.maxDownKbps,
       maxUpKbps: this.maxUpKbps,
     });
 
-    // Restore downloads from database
-    const downloads = await db.getAllDownloads();
-    log.info(`Restoring ${downloads.length} downloads from database`);
-    
-    for (const download of downloads) {
-      if (download.status === 'removed') continue;
-      
-      // Store in managed map
+    // Apply speed throttle to WebTorrent client (best-effort — API availability depends on version)
+    if (this.maxDownKbps > 0) {
+      try { (this.client as any).throttleDownload?.(this.maxDownKbps * 1024); } catch (_) { /* unsupported */ }
+      log.info('Download throttle applied', { limitKbps: this.maxDownKbps });
+    }
+    if (this.maxUpKbps > 0) {
+      try { (this.client as any).throttleUpload?.(this.maxUpKbps * 1024); } catch (_) { /* unsupported */ }
+      log.info('Upload throttle applied', { limitKbps: this.maxUpKbps });
+    }
+
+    // Load all downloads; permanently purge any stale 'removed' records left by older
+    // app versions that used markAsRemoved instead of deleteDownload. This prevents
+    // deleted torrents from resurrecting on the next launch.
+    const allDownloads = await db.getAllDownloads();
+    const activeDownloads: typeof allDownloads = [];
+    for (const d of allDownloads) {
+      if (d.status === 'removed') {
+        try { await db.deleteDownload(d.id); } catch (_) { /* ignore */ }
+        log.debug('Purged stale removed record', { id: d.id });
+      } else {
+        activeDownloads.push(d);
+      }
+    }
+
+    log.info(`Restoring ${activeDownloads.length} downloads from database`);
+
+    for (const download of activeDownloads) {
+      // Store in managed map, restoring persisted selectedFiles
       this.managedTorrents.set(download.id, {
         id: download.id,
         torrent: null,
         download,
         infoHash: null,
+        selectedFiles: download.selectedFiles,
       });
-      
+
       // Re-add torrents that were active
       if (['downloading', 'seeding', 'queued'].includes(download.status)) {
         await this.restoreTorrent(download);
       }
     }
-    
+
     // Start stats broadcasting
     this.startStatsBroadcast();
-    
+
     // Process queue
     await this.processQueue();
 
@@ -143,7 +166,7 @@ export class TorrentManager {
         source = download.sourceUri;
       }
       
-      await this.addTorrentInternal(download.id, source, download.savePath, false);
+      await this.addTorrentInternal(download.id, source, download.savePath, false, download.selectedFiles);
       log.debug('Torrent restored successfully', { id: download.id });
     } catch (error) {
       log.error('Failed to restore torrent', {
@@ -277,7 +300,12 @@ export class TorrentManager {
           return;
         }
 
-        tempClient.add(sourceUri, { path: app.getPath('temp') }, (torrent) => {
+        let sourceInput: string | Buffer = sourceUri;
+        if (params.torrentPath && fs.existsSync(params.torrentPath)) {
+          sourceInput = fs.readFileSync(params.torrentPath);
+        }
+
+        tempClient.add(sourceInput, { path: app.getPath('temp') }, (torrent) => {
           if (resolved) return;
           
           clearTimeout(timeout);
@@ -368,7 +396,7 @@ export class TorrentManager {
     if (infoHashToCheck) {
       // Check if already being added (race condition protection)
       if (this.addingTorrents.has(infoHashToCheck)) {
-        const errorMessage = 'Этот торрент уже добавляется, пожалуйста подождите';
+        const errorMessage = 'This torrent is already being added, please wait';
         log.warn('Duplicate torrent rejected (currently being added)', {
           infoHash: infoHashToCheck
         });
@@ -388,7 +416,7 @@ export class TorrentManager {
         if (existingId) {
           const existing = this.managedTorrents.get(existingId);
           if (existing && existing.download.status !== 'removed') {
-            const errorMessage = `Этот торрент уже в загрузках: "${existing.download.name}"`;
+            const errorMessage = `This torrent is already in downloads: "${existing.download.name}"`;
             log.warn('Duplicate torrent rejected (by infoHash index)', {
               infoHash: infoHashToCheck,
               existingId,
@@ -402,7 +430,7 @@ export class TorrentManager {
         for (const [existingId, managed] of this.managedTorrents.entries()) {
           if (managed.download.status === 'removed') continue;
           if (managed.infoHash === infoHashToCheck) {
-            const errorMessage = `Этот торрент уже в загрузках: "${managed.download.name}"`;
+            const errorMessage = `This torrent is already in downloads: "${managed.download.name}"`;
             log.warn('Duplicate torrent rejected (by managed torrents scan)', {
               infoHash: infoHashToCheck,
               existingId,
@@ -419,7 +447,7 @@ export class TorrentManager {
 
         if (params.sourceType === 'magnet' && managed.download.sourceType === 'magnet') {
           if (managed.download.sourceUri === params.sourceUri) {
-            const errorMessage = `Этот торрент уже в загрузках: "${managed.download.name}"`;
+            const errorMessage = `This torrent is already in downloads: "${managed.download.name}"`;
             log.warn('Duplicate torrent rejected (by magnet URI)', {
               existingId,
               existingName: managed.download.name
@@ -439,7 +467,7 @@ export class TorrentManager {
           const normalizedExistingName = managed.download.name.toLowerCase().trim();
 
           if (normalizedNewName === normalizedExistingName) {
-            const errorMessage = `Торрент с таким именем уже в загрузках: "${managed.download.name}"`;
+            const errorMessage = `Torrent with this name is already in downloads: "${managed.download.name}"`;
             log.warn('Duplicate torrent rejected (by name)', {
               existingId,
               existingName: managed.download.name,
@@ -463,7 +491,7 @@ export class TorrentManager {
       const minimumRequired = 100 * 1024 * 1024; // 100 MB minimum
 
       if (availableSpace !== null && availableSpace < minimumRequired) {
-        const errorMessage = `Недостаточно места на диске. Доступно: ${formatBytes(availableSpace)}, требуется минимум ${formatBytes(minimumRequired)}`;
+        const errorMessage = `Not enough disk space. Available: ${formatBytes(availableSpace)}, minimum required: ${formatBytes(minimumRequired)}`;
         log.error('Insufficient disk space', {
           savePath,
           available: availableSpace,
@@ -506,6 +534,7 @@ export class TorrentManager {
         torrentFilePath,
         savePath,
         status: 'queued',
+        selectedFiles: params.selectedFiles,
       });
 
       log.info('Download record created', { id: download.id });
@@ -645,21 +674,23 @@ export class TorrentManager {
           managed.torrent = null;
           managed.infoHash = null;
           
-          const errorMessage = `Этот торрент уже добавлен: "${duplicateName}"`;
+          const errorMessage = `This torrent is already added: "${duplicateName}"`;
           
-          // Полностью удаляем дубликат из системы
-          await db.markDownloadRemoved(id);
+        // Completely remove duplicate from system — use hard delete to prevent resurrection
+          await db.deleteDownload(id);
           this.managedTorrents.delete(id);
           
           reject(new TorrentError(errorMessage, 'DUPLICATE', id));
           return;
         }
 
-        // Update name from torrent metadata
+        // Update name and totalSize from torrent metadata
         const name = torrent.name || 'Unknown';
+        const totalSize = torrent.length || 0;
         managed.download.name = name;
-        
-        log.debug('Torrent ready', { id, name, infoHash });
+        managed.download.totalSize = totalSize;
+
+        log.debug('Torrent ready', { id, name, infoHash, totalSize });
 
         // Update database with torrent metadata
         if (isNew || managed.download.name === 'Loading...') {
@@ -673,9 +704,10 @@ export class TorrentManager {
             peers: torrent.numPeers,
             seeds: 0,
             name,
+            totalSize,
           });
         }
-        
+
         resolve();
       });
       
@@ -683,6 +715,10 @@ export class TorrentManager {
         log.info('Torrent completed', { id, name: managed.download.name });
         if (managed.download.status === 'downloading') {
           await this.transitionStatus(id, 'seeding');
+          // Notify completion listeners (used for OS notifications)
+          for (const cb of this.completionCallbacks) {
+            try { cb({ id, name: managed.download.name }); } catch (_) { /* ignore */ }
+          }
         }
       });
       
@@ -718,24 +754,25 @@ export class TorrentManager {
    */
   private async processQueue(): Promise<void> {
     const activeCount = this.getActiveCount();
-    
+
     log.debug('Processing queue', { activeCount, maxActive: this.maxActiveDownloads });
 
     if (activeCount >= this.maxActiveDownloads) {
       log.debug('Max active downloads reached, skipping queue processing');
       return;
     }
-    
-    // Find queued downloads
+
+    // Find queued downloads, sorted by priority (2=high → 1=normal → 0=low)
     const queued = await db.getDownloadsByStatus('queued');
+    queued.sort((a, b) => (b.priority || 0) - (a.priority || 0));
     const slotsAvailable = this.maxActiveDownloads - activeCount;
-    
+
     log.debug('Queue status', { queuedCount: queued.length, slotsAvailable });
 
     for (let i = 0; i < Math.min(queued.length, slotsAvailable); i++) {
       const download = queued[i];
       const managed = this.managedTorrents.get(download.id);
-      
+
       if (managed && !managed.torrent) {
         try {
           let source: string;
@@ -744,12 +781,12 @@ export class TorrentManager {
           } else {
             source = download.sourceUri;
           }
-          
-          log.debug('Starting queued download', { id: download.id });
+
+          log.debug('Starting queued download', { id: download.id, priority: download.priority });
           await this.addTorrentInternal(
-            download.id, 
-            source, 
-            download.savePath, 
+            download.id,
+            source,
+            download.savePath,
             true,
             managed.selectedFiles
           );
@@ -758,7 +795,6 @@ export class TorrentManager {
             id: download.id,
             error: error instanceof Error ? error.message : String(error),
           });
-          // Error state is already set by addTorrentInternal
         }
       }
     }
@@ -871,20 +907,21 @@ export class TorrentManager {
       );
     }
     
-    // Destroy the torrent completely to stop all connections
+    // Destroy the WebTorrent instance to actually stop data transfer.
+    // WebTorrent 1.9.7 does not reliably support torrent.pause().
+    // Data on disk is preserved (destroyStore: false).
     if (managed.torrent) {
-      log.debug('Destroying torrent to pause completely', { id, infoHash: managed.infoHash });
-      await new Promise<void>((resolve) => {
-        managed.torrent!.destroy({ destroyStore: false }, () => {
-          // Clear torrent reference to free memory
-          managed.torrent = null;
-          resolve();
-        });
-      });
+      log.debug('Destroying torrent instance for pause', { id, infoHash: managed.infoHash });
+      try {
+        managed.torrent.destroy({ destroyStore: false } as any);
+      } catch (e) {
+        log.warn('Error destroying torrent during pause (non-fatal)', { error: String(e) });
+      }
+      managed.torrent = null;
     }
-    
+
     await this.transitionStatus(id, 'paused');
-    
+
     // Process queue to start next download
     await this.processQueue();
 
@@ -910,31 +947,21 @@ export class TorrentManager {
       );
     }
     
-    // If torrent was destroyed during pause, re-queue to restart
-    if (!managed.torrent) {
-      log.debug('Torrent was destroyed, re-queueing', { id });
-      await this.transitionStatus(id, 'queued');
-      await this.processQueue();
-    } else {
-      // If torrent still exists (shouldn't happen after new pause logic), just resume
-      managed.torrent.resume();
-      
-      const newStatus = managed.torrent.done ? 'seeding' : 'downloading';
-      await this.transitionStatus(id, newStatus);
+    if (managed.torrent) {
+      // Torrent still in memory but shouldn't be — destroy it cleanly first
+      log.debug('Torrent still in memory on resume, destroying first', { id });
+      try {
+        managed.torrent.destroy({ destroyStore: false } as any);
+      } catch (_) { /* ignore */ }
+      managed.torrent = null;
     }
 
+    // Re-queue the download so processQueue will re-add it to WebTorrent
+    log.debug('Re-queueing download for resume', { id });
+    await this.transitionStatus(id, 'queued');
+    await this.processQueue();
+
     log.debug('Download resumed successfully', { id });
-  }
-  
-  /**
-   * Mark download as removed in database
-   */
-  private async markDownloadRemoved(id: string): Promise<void> {
-    try {
-      await db.markDownloadRemoved(id);
-    } catch (e) {
-      log.warn('Failed to mark download as removed in database', { id, error: e });
-    }
   }
 
   /**
@@ -999,8 +1026,9 @@ export class TorrentManager {
       }
     }
     
-    // Remove from database (mark as removed)
-    await db.markDownloadRemoved(id);
+    // Permanently delete from database — prevents resurrection on next launch
+    await db.deleteDownload(id);
+    log.debug('Download deleted from store', { id });
     
     // Remove from managed map
     this.managedTorrents.delete(id);
@@ -1129,7 +1157,8 @@ export class TorrentManager {
           upSpeedBps: torrent.uploadSpeed,
           etaSeconds: torrent.timeRemaining > 0 ? Math.floor(torrent.timeRemaining / 1000) : null,
           peers: torrent.numPeers,
-          seeds: 0,
+          // WebTorrent doesn't distinguish seeds from peers; show numPeers when seeding
+          seeds: download.status === 'seeding' ? torrent.numPeers : 0,
           status: download.status,
         });
       } else {
@@ -1158,6 +1187,16 @@ export class TorrentManager {
     this.statsCallbacks.add(callback);
     return () => {
       this.statsCallbacks.delete(callback);
+    };
+  }
+
+  /**
+   * Subscribe to download completion events (for OS notifications)
+   */
+  onComplete(callback: CompletionCallback): () => void {
+    this.completionCallbacks.add(callback);
+    return () => {
+      this.completionCallbacks.delete(callback);
     };
   }
   
@@ -1218,11 +1257,15 @@ export class TorrentManager {
     }
     if (settings.maxDownKbps !== undefined) {
       this.maxDownKbps = settings.maxDownKbps;
+      // Attempt to apply throttle dynamically (best-effort)
+      try { (this.client as any).throttleDownload?.(this.maxDownKbps > 0 ? this.maxDownKbps * 1024 : 0); } catch (_) { /* unsupported */ }
     }
     if (settings.maxUpKbps !== undefined) {
       this.maxUpKbps = settings.maxUpKbps;
+      // Attempt to apply throttle dynamically (best-effort)
+      try { (this.client as any).throttleUpload?.(this.maxUpKbps > 0 ? this.maxUpKbps * 1024 : 0); } catch (_) { /* unsupported */ }
     }
-    
+
     // Process queue in case max downloads changed
     await this.processQueue();
   }

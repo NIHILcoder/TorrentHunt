@@ -1422,7 +1422,7 @@
   position: absolute;
 }
 
-/* Toggle Track - единственный кружок без дублирования */
+/* Toggle Track - single circle without duplication */
 .toggle-track {
   position: absolute;
   inset: 0;

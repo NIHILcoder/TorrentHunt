@@ -10,8 +10,9 @@ import CatalogPage from './pages/CatalogPage';
 import CreateTorrentPage from './pages/CreateTorrentPage';
 import DownloadsPage from './pages/DownloadsPage';
 import SettingsPage from './pages/SettingsPage';
+import { I18nProvider } from './utils/i18nContext';
 
-const App: React.FC = () => {
+const AppContent: React.FC = () => {
   const [currentPage, setCurrentPage] = useState<PageId>('downloads');
   const [stats, setStats] = useState<DownloadStats[]>([]);
   const [downloads, setDownloads] = useState<Download[]>([]);
@@ -75,6 +76,27 @@ const App: React.FC = () => {
     return () => unsubscribe();
   }, []);
 
+  // Listen for opening torrent files/magnet links from OS
+  useEffect(() => {
+    const unsubscribe = window.api.onOpenTorrent(async (torrentUri) => {
+      try {
+        // Change page to downloads
+        setCurrentPage('downloads');
+
+        // Determine type and add directly
+        const isMagnet = torrentUri.startsWith('magnet:');
+        await window.api.addDownload({
+          sourceType: isMagnet ? 'magnet' : 'torrent_file',
+          sourceUri: torrentUri
+        });
+      } catch (error) {
+        console.error('Failed to add torrent from OS open:', error);
+      }
+    });
+
+    return () => unsubscribe();
+  }, []);
+
   // Global hotkeys handler
   useEffect(() => {
     // Load hotkeys from localStorage
@@ -114,7 +136,7 @@ const App: React.FC = () => {
       if (e.shiftKey) keys.push('Shift');
       if (e.altKey) keys.push('Alt');
       if (e.metaKey) keys.push('Meta');
-      
+
       // Use event.code for physical key position
       const code = e.code;
       if (code && !['ControlLeft', 'ControlRight', 'ShiftLeft', 'ShiftRight', 'AltLeft', 'AltRight', 'MetaLeft', 'MetaRight'].includes(code)) {
@@ -127,7 +149,7 @@ const App: React.FC = () => {
         const hotkeyString = (hotkeyKeys as string[]).join('+');
         if (keyString === hotkeyString) {
           e.preventDefault();
-          
+
           // Execute action
           switch (action) {
             case 'open-downloads':
@@ -221,6 +243,14 @@ const App: React.FC = () => {
         </main>
       </div>
     </>
+  );
+};
+
+const App: React.FC = () => {
+  return (
+    <I18nProvider>
+      <AppContent />
+    </I18nProvider>
   );
 };
 

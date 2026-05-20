@@ -155,18 +155,18 @@ export class SeedingOptimizer {
    */
   private getRecommendationReason(priority: any): string {
     if (priority.rarity > 90) {
-      return '🔥 Критический торрент! Последний сид';
+      return '🔥 Critical torrent! Last remaining seed';
     }
     if (priority.demand > 80) {
-      return '⚡ Высокий спрос! Много желающих скачать';
+      return '⚡ High demand! Many users waiting to download';
     }
     if (priority.rarity > 70) {
-      return '💎 Редкий торрент, нужна помощь';
+      return '💎 Rare torrent, needs help';
     }
     if (priority.bounty > 50) {
-      return '💰 Высокая награда за раздачу';
+      return '💰 High reward for seeding';
     }
-    return '✅ Хороший выбор для раздачи';
+    return '✅ Good choice for seeding';
   }
 
   /**
