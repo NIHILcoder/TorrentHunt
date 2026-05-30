@@ -10,7 +10,10 @@ import CatalogPage from './pages/CatalogPage';
 import CreateTorrentPage from './pages/CreateTorrentPage';
 import DownloadsPage from './pages/DownloadsPage';
 import SettingsPage from './pages/SettingsPage';
+import SearchPage from './pages/SearchPage';
+import RSSPage from './pages/RSSPage';
 import { I18nProvider } from './utils/i18nContext';
+
 
 const AppContent: React.FC = () => {
   const [currentPage, setCurrentPage] = useState<PageId>('downloads');
@@ -203,6 +206,10 @@ const AppContent: React.FC = () => {
         return <DownloadsPage filterMode={filterMode} onFilterChange={setFilterMode} />;
       case 'settings':
         return <SettingsPage />;
+      case 'search':
+        return <SearchPage />;
+      case 'rss':
+        return <RSSPage />;
       default:
         return <DownloadsPage filterMode={filterMode} onFilterChange={setFilterMode} />;
     }

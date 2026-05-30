@@ -8,6 +8,8 @@ import {
   DownloadStats,
   SourceType,
   TorrentFile,
+  FilePriority,
+  TrackerInfo,
 } from '../../shared/types';
 import {
   isValidTransition,
@@ -59,14 +61,16 @@ export class TorrentError extends Error {
 export class TorrentManager {
   private client: WebTorrent.Instance;
   private managedTorrents: Map<string, ManagedTorrent> = new Map();
-  private infoHashIndex: Map<string, string> = new Map(); // infoHash -> download id
-    private addingTorrents: Set<string> = new Set(); // infoHashes being added (to prevent race conditions)
+  private infoHashIndex: Map<string, string> = new Map();
+    private addingTorrents: Set<string> = new Set();
   private statsInterval: NodeJS.Timeout | null = null;
   private statsCallbacks: Set<StatsCallback> = new Set();
   private completionCallbacks: Set<CompletionCallback> = new Set();
   private maxActiveDownloads = 3;
   private maxDownKbps = 0;
   private maxUpKbps = 0;
+  private defaultSeedRatioLimit = 0;
+  private defaultSeedTimeLimitMinutes = 0;
   
   constructor() {
     this.client = new WebTorrent();
@@ -89,6 +93,8 @@ export class TorrentManager {
     this.maxActiveDownloads = settings.maxActiveDownloads;
     this.maxDownKbps = settings.maxDownKbps;
     this.maxUpKbps = settings.maxUpKbps;
+    this.defaultSeedRatioLimit = settings.defaultSeedRatioLimit ?? 0;
+    this.defaultSeedTimeLimitMinutes = settings.defaultSeedTimeLimitMinutes ?? 0;
 
     log.debug('Settings loaded', {
       maxActiveDownloads: this.maxActiveDownloads,
@@ -715,12 +721,16 @@ export class TorrentManager {
         log.info('Torrent completed', { id, name: managed.download.name });
         if (managed.download.status === 'downloading') {
           await this.transitionStatus(id, 'seeding');
+          // Record when seeding started for time-limit tracking
+          await db.updateDownloadField(id, 'seedingStartedAt', Date.now());
+          managed.download.seedingStartedAt = Date.now();
           // Notify completion listeners (used for OS notifications)
           for (const cb of this.completionCallbacks) {
             try { cb({ id, name: managed.download.name }); } catch (_) { /* ignore */ }
           }
         }
       });
+
       
       // WebTorrent types are incomplete - error event exists but isn't typed correctly
       (torrent as unknown as NodeJS.EventEmitter).on('error', async (err: Error) => {
@@ -1228,6 +1238,9 @@ export class TorrentManager {
           // Ignore update errors
         }
       }
+
+      // Check seeding limits (ratio + time)
+      await this.checkSeedingLimits();
       
       // Broadcast to callbacks
       for (const callback of this.statsCallbacks) {
@@ -1237,7 +1250,8 @@ export class TorrentManager {
           log.error('Stats callback error', { error: e instanceof Error ? e.message : String(e) });
         }
       }
-    }, 750); // 750ms interval
+    }, 750);
+ // 750ms interval
 
     log.debug('Stats broadcast started');
   }
@@ -1249,6 +1263,8 @@ export class TorrentManager {
     maxActiveDownloads?: number;
     maxDownKbps?: number;
     maxUpKbps?: number;
+    defaultSeedRatioLimit?: number;
+    defaultSeedTimeLimitMinutes?: number;
   }): Promise<void> {
     log.debug('Updating settings', settings);
 
@@ -1257,18 +1273,218 @@ export class TorrentManager {
     }
     if (settings.maxDownKbps !== undefined) {
       this.maxDownKbps = settings.maxDownKbps;
-      // Attempt to apply throttle dynamically (best-effort)
       try { (this.client as any).throttleDownload?.(this.maxDownKbps > 0 ? this.maxDownKbps * 1024 : 0); } catch (_) { /* unsupported */ }
     }
     if (settings.maxUpKbps !== undefined) {
       this.maxUpKbps = settings.maxUpKbps;
-      // Attempt to apply throttle dynamically (best-effort)
       try { (this.client as any).throttleUpload?.(this.maxUpKbps > 0 ? this.maxUpKbps * 1024 : 0); } catch (_) { /* unsupported */ }
     }
+    if (settings.defaultSeedRatioLimit !== undefined) {
+      this.defaultSeedRatioLimit = settings.defaultSeedRatioLimit;
+    }
+    if (settings.defaultSeedTimeLimitMinutes !== undefined) {
+      this.defaultSeedTimeLimitMinutes = settings.defaultSeedTimeLimitMinutes;
+    }
 
-    // Process queue in case max downloads changed
     await this.processQueue();
   }
+
+  // ============================================================
+  // Priority 1: New Engine Features
+  // ============================================================
+
+  /**
+   * Toggle sequential download mode.
+   * In WebTorrent this is approximated by controlling file select/deselect order.
+   */
+  async setSequentialDownload(id: string, enabled: boolean): Promise<void> {
+    const managed = this.managedTorrents.get(id);
+    if (!managed) throw new TorrentError('Download not found', 'NOT_FOUND', id);
+
+    managed.download.sequentialDownload = enabled;
+    await db.updateDownloadField(id, 'sequentialDownload', enabled);
+
+    if (managed.torrent) {
+      try {
+        // WebTorrent: enable criticalLength to download pieces sequentially
+        if (enabled) {
+          // Select files in order to force sequential piece selection
+          managed.torrent.files.forEach((file, i) => {
+            file.select();
+          });
+          // If the torrent library supports it, try to set sequential mode
+          (managed.torrent as any).critical?.(0, managed.torrent.pieces?.length ?? 0);
+        }
+      } catch (_) { /* unsupported — best effort */ }
+    }
+
+    log.info('Sequential download set', { id, enabled });
+  }
+
+  /**
+   * Set per-file download priority.
+   * 'skip' = deselect (don't download), others = select.
+   */
+  async setFilePriority(id: string, fileIndex: number, priority: FilePriority): Promise<void> {
+    const managed = this.managedTorrents.get(id);
+    if (!managed) throw new TorrentError('Download not found', 'NOT_FOUND', id);
+
+    // Persist priority
+    const priorities = managed.download.filePriorities ?? [];
+    priorities[fileIndex] = priority;
+    managed.download.filePriorities = priorities;
+    await db.updateDownloadField(id, 'filePriorities', priorities);
+
+    if (managed.torrent) {
+      const file = managed.torrent.files[fileIndex];
+      if (file) {
+        if (priority === 'skip') {
+          file.deselect();
+          log.info('File deselected (skip)', { id, fileIndex, name: file.name });
+        } else {
+          file.select();
+          log.info('File selected', { id, fileIndex, name: file.name, priority });
+        }
+      }
+    }
+  }
+
+  /**
+   * Set per-torrent speed limits (overrides global limits for this torrent).
+   */
+  async setTorrentSpeedLimits(id: string, downKbps: number, upKbps: number): Promise<void> {
+    const managed = this.managedTorrents.get(id);
+    if (!managed) throw new TorrentError('Download not found', 'NOT_FOUND', id);
+
+    managed.download.maxDownloadSpeed = downKbps;
+    managed.download.maxUploadSpeed = upKbps;
+    await db.updateDownloadFields(id, { maxDownloadSpeed: downKbps, maxUploadSpeed: upKbps });
+
+    if (managed.torrent) {
+      try {
+        (managed.torrent as any).throttleDownload?.(downKbps > 0 ? downKbps * 1024 : 0);
+      } catch (_) { /* unsupported */ }
+      try {
+        (managed.torrent as any).throttleUpload?.(upKbps > 0 ? upKbps * 1024 : 0);
+      } catch (_) { /* unsupported */ }
+    }
+
+    log.info('Per-torrent speed limits set', { id, downKbps, upKbps });
+  }
+
+  /**
+   * Set seed ratio limit for a specific torrent.
+   * 0 = unlimited (use global default).
+   */
+  async setSeedRatioLimit(id: string, ratio: number): Promise<void> {
+    const managed = this.managedTorrents.get(id);
+    if (!managed) throw new TorrentError('Download not found', 'NOT_FOUND', id);
+
+    managed.download.seedRatioLimit = ratio;
+    await db.updateDownloadField(id, 'seedRatioLimit', ratio);
+    log.info('Seed ratio limit set', { id, ratio });
+  }
+
+  /**
+   * Set seed time limit for a specific torrent.
+   * 0 = unlimited.
+   */
+  async setSeedTimeLimit(id: string, minutes: number): Promise<void> {
+    const managed = this.managedTorrents.get(id);
+    if (!managed) throw new TorrentError('Download not found', 'NOT_FOUND', id);
+
+    managed.download.seedTimeLimitMinutes = minutes;
+    await db.updateDownloadField(id, 'seedTimeLimitMinutes', minutes);
+    log.info('Seed time limit set', { id, minutes });
+  }
+
+  /**
+   * Get current tracker info for a torrent.
+   */
+  getTrackers(id: string): TrackerInfo[] {
+    const managed = this.managedTorrents.get(id);
+    if (!managed?.torrent) return [];
+
+    try {
+      const trackers: any[] = (managed.torrent as any)._trackers ?? [];
+      return trackers.map((t: any): TrackerInfo => ({
+        url: t.announce || t.announceUrl || String(t),
+        status: t.destroy ? 'connected' : 'disconnected',
+        peers: typeof t.peers === 'number' ? t.peers : 0,
+        lastAnnounce: t.lastAnnounce ? new Date(t.lastAnnounce).toISOString() : undefined,
+      }));
+    } catch (_) {
+      return [];
+    }
+  }
+
+  /**
+   * Add a tracker URL to an active torrent.
+   */
+  addTracker(id: string, url: string): void {
+    const managed = this.managedTorrents.get(id);
+    if (!managed?.torrent) throw new TorrentError('Download not active', 'INVALID_STATE', id);
+
+    try {
+      (managed.torrent as any).addTracker?.(url);
+      log.info('Tracker added', { id, url });
+    } catch (err) {
+      log.warn('addTracker not supported by WebTorrent version', { error: err });
+    }
+  }
+
+  /**
+   * Remove a tracker URL from an active torrent.
+   */
+  removeTracker(id: string, url: string): void {
+    const managed = this.managedTorrents.get(id);
+    if (!managed?.torrent) throw new TorrentError('Download not active', 'INVALID_STATE', id);
+
+    try {
+      (managed.torrent as any).removeTracker?.(url);
+      log.info('Tracker removed', { id, url });
+    } catch (err) {
+      log.warn('removeTracker not supported by WebTorrent version', { error: err });
+    }
+  }
+
+  /**
+   * Check seeding limits (ratio + time) for all seeding torrents.
+   * Called every stats tick.
+   */
+  private async checkSeedingLimits(): Promise<void> {
+    for (const managed of this.managedTorrents.values()) {
+      if (managed.download.status !== 'seeding') continue;
+
+      const d = managed.download;
+      const ratio = d.downloadedBytes > 0 ? d.uploadedBytes / d.downloadedBytes : 0;
+
+      // Effective ratio limit: per-torrent overrides global
+      const ratioLimit = (d.seedRatioLimit != null && d.seedRatioLimit > 0)
+        ? d.seedRatioLimit
+        : this.defaultSeedRatioLimit;
+
+      if (ratioLimit > 0 && ratio >= ratioLimit) {
+        log.info('Auto-stopped seeding (ratio limit reached)', { id: managed.id, ratio: ratio.toFixed(2), limit: ratioLimit });
+        try { await this.stopSeeding(managed.id); } catch (_) { /* already stopped */ }
+        continue;
+      }
+
+      // Effective time limit: per-torrent overrides global
+      const timeLimit = (d.seedTimeLimitMinutes != null && d.seedTimeLimitMinutes > 0)
+        ? d.seedTimeLimitMinutes
+        : this.defaultSeedTimeLimitMinutes;
+
+      if (timeLimit > 0 && d.seedingStartedAt) {
+        const elapsedMinutes = (Date.now() - d.seedingStartedAt) / 60000;
+        if (elapsedMinutes >= timeLimit) {
+          log.info('Auto-stopped seeding (time limit reached)', { id: managed.id, elapsedMinutes: Math.round(elapsedMinutes), limit: timeLimit });
+          try { await this.stopSeeding(managed.id); } catch (_) { /* already stopped */ }
+        }
+      }
+    }
+  }
+
   
   /**
    * Destroy the manager (cleanup on app quit)

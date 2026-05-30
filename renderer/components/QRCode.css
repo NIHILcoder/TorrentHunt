@@ -1,4 +1,4 @@
-/* QR Code Styles */
+/* QRCode.css — TorrentHunt Design System 2.0 */
 
 .qr-code-container {
   display: flex;
@@ -6,8 +6,8 @@
   justify-content: center;
   padding: 16px;
   background: #ffffff;
-  border-radius: 8px;
-  border: 1px solid var(--border-color);
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--color-border-default);
 }
 
 .qr-code-canvas {

@@ -7,6 +7,10 @@ import { getSchedulerEngine } from './scheduler/scheduler-engine';
 import { setupIpcHandlers } from './ipc';
 import { logger, detectVPN, showVPNWarning } from './utils';
 import { store } from './db/store';
+import { getRSSService } from './services/rss-service';
+import { getIPBlocklistService } from './services/ip-blocklist';
+import { getWatchFolderService } from './torrent/watch-folder';
+
 
 // Load environment variables
 dotenv.config();
@@ -50,7 +54,6 @@ if (process.defaultApp) {
 function createTray(): void {
   // Create a simple 16x16 tray icon programmatically
   const iconSize = 16;
-  const canvas = nativeImage.createEmpty();
   
   // Use a simple colored square as tray icon — or load from file if available
   const iconPath = path.join(__dirname, '../../assets/tray-icon.png');
@@ -76,21 +79,43 @@ function createTray(): void {
   }
 
   tray = new Tray(trayIcon.resize({ width: 16, height: 16 }));
-  tray.setToolTip('TorrentHunt');
+  tray.setToolTip('TorrentHunt — Running in background');
 
-  const contextMenu = Menu.buildFromTemplate([
+  const buildContextMenu = () => Menu.buildFromTemplate([
     {
-      label: 'Show TorrentHunt',
+      label: 'Open TorrentHunt',
+      type: 'normal',
       click: () => {
         if (mainWindow) {
           mainWindow.show();
           mainWindow.focus();
+          if (mainWindow.isMinimized()) mainWindow.restore();
         }
       },
     },
     { type: 'separator' },
     {
-      label: 'Quit',
+      label: 'Pause All Downloads',
+      type: 'normal',
+      click: () => {
+        if (mainWindow && !mainWindow.isDestroyed()) {
+          mainWindow.webContents.send('app:pauseAll');
+        }
+      },
+    },
+    {
+      label: 'Resume All Downloads',
+      type: 'normal',
+      click: () => {
+        if (mainWindow && !mainWindow.isDestroyed()) {
+          mainWindow.webContents.send('app:resumeAll');
+        }
+      },
+    },
+    { type: 'separator' },
+    {
+      label: 'Quit TorrentHunt',
+      type: 'normal',
       click: () => {
         isQuitting = true;
         app.quit();
@@ -98,12 +123,21 @@ function createTray(): void {
     },
   ]);
 
-  tray.setContextMenu(contextMenu);
+  tray.setContextMenu(buildContextMenu());
+
+  // Rebuild menu when needed (e.g., after settings change)
+  tray.on('right-click', () => {
+    tray?.setContextMenu(buildContextMenu());
+  });
 
   tray.on('double-click', () => {
     if (mainWindow) {
-      mainWindow.show();
-      mainWindow.focus();
+      if (mainWindow.isVisible()) {
+        mainWindow.focus();
+      } else {
+        mainWindow.show();
+        mainWindow.focus();
+      }
     }
   });
 }
@@ -136,11 +170,16 @@ function createTrayIconPNG(): number[] {
 }
 
 async function createWindow(): Promise<void> {
+  // Check if we should start hidden (launched at login with openAsHidden)
+  const loginSettings = app.getLoginItemSettings();
+  const startHidden = loginSettings.wasOpenedAsHidden === true;
+
   mainWindow = new BrowserWindow({
     width: 1200,
     height: 800,
     minWidth: 800,
     minHeight: 600,
+    show: !startHidden, // Don't show window if launched hidden at startup
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
@@ -166,6 +205,13 @@ async function createWindow(): Promise<void> {
     // No DevTools in production
   }
 
+  // Show window once ready (after content loaded) if not starting hidden
+  if (!startHidden) {
+    mainWindow.once('ready-to-show', () => {
+      mainWindow?.show();
+    });
+  }
+
   // === Tray behavior: Minimize to Tray ===
   mainWindow.on('minimize', (event: Electron.Event) => {
     const settings = store.get('settings') as any;
@@ -182,8 +228,14 @@ async function createWindow(): Promise<void> {
       if (settings?.closeToTray) {
         event.preventDefault();
         mainWindow?.hide();
+        // Update tray tooltip to indicate background mode
+        tray?.setToolTip('TorrentHunt — Running in background');
       }
     }
+  });
+
+  mainWindow.on('show', () => {
+    tray?.setToolTip('TorrentHunt');
   });
 
   mainWindow.on('closed', () => {
@@ -239,6 +291,37 @@ async function initializeApp(): Promise<void> {
     app.setLoginItemSettings({ openAtLogin: settings.autoLaunch });
   }
 
+  // Initialize IP blocklist (load from store, apply to client)
+  try {
+    const torrentManager = getTorrentManager();
+    const blocklistService = getIPBlocklistService();
+    await blocklistService.loadAll();
+    blocklistService.applyToClient((torrentManager as any).client);
+    logger.info('App', 'IP blocklist service initialized.');
+  } catch (e) {
+    logger.error('App', 'Failed to initialize IP blocklist', { error: e });
+  }
+
+  // Initialize RSS service
+  try {
+    const rssService = getRSSService();
+    await rssService.initialize();
+    logger.info('App', 'RSS service initialized.');
+  } catch (e) {
+    logger.error('App', 'Failed to initialize RSS service', { error: e });
+  }
+
+  // Initialize watch folder
+  try {
+    if (settings?.watchFolderEnabled && settings?.watchFolderPath) {
+      const watchFolder = getWatchFolderService();
+      watchFolder.start(settings.watchFolderPath, settings.watchFolderDeleteAfterAdd ?? false);
+      logger.info('App', 'Watch folder service started.', { path: settings.watchFolderPath });
+    }
+  } catch (e) {
+    logger.error('App', 'Failed to initialize watch folder', { error: e });
+  }
+
   // Check VPN status on startup
   setTimeout(async () => {
     try {
@@ -269,10 +352,12 @@ app.whenReady().then(initializeApp);
 app.on('window-all-closed', async () => {
   // On macOS, keep app running until explicitly quit
   if (process.platform !== 'darwin') {
-    // Don't quit if we have tray and close-to-tray enabled
+    // Don't quit if close-to-tray is enabled — app keeps running in tray
     const settings = store.get('settings') as any;
     if (settings?.closeToTray && !isQuitting) {
-      return; // Keep running in tray
+      // App continues running in the system tray
+      logger.info('App', 'Window closed — continuing in system tray');
+      return;
     }
     await cleanup();
     app.quit();
@@ -345,6 +430,24 @@ async function cleanup(): Promise<void> {
     logger.info('App', 'Scheduler engine destroyed.');
   } catch (e) {
     logger.error('App', 'Error destroying scheduler', { error: e });
+  }
+
+  // Stop RSS service
+  try {
+    const rssService = getRSSService();
+    rssService.destroy();
+    logger.info('App', 'RSS service destroyed.');
+  } catch (e) {
+    logger.error('App', 'Error destroying RSS service', { error: e });
+  }
+
+  // Stop watch folder
+  try {
+    const watchFolder = getWatchFolderService();
+    watchFolder.stop();
+    logger.info('App', 'Watch folder service stopped.');
+  } catch (e) {
+    logger.error('App', 'Error stopping watch folder', { error: e });
   }
 
   // Destroy tray

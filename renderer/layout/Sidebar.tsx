@@ -8,7 +8,7 @@ import React, { useState } from 'react';
 import { Icon, IconName } from '../components';
 import { useTranslation } from '../utils/i18nContext';
 
-export type PageId = 'downloads' | 'catalog' | 'settings' | 'create-torrent';
+export type PageId = 'downloads' | 'catalog' | 'settings' | 'create-torrent' | 'search' | 'rss';
 export type FilterMode = 'all' | 'downloading' | 'completed' | 'paused' | 'error';
 
 interface NavItem {
@@ -55,6 +55,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
   const navItems: NavItem[] = [
     { id: 'downloads', label: t('nav.downloads'), icon: 'download', hasSubmenu: true },
+    { id: 'search', label: 'Search', icon: 'search' },
+    { id: 'rss', label: 'RSS Feeds', icon: 'rss' },
     { id: 'catalog', label: t('nav.catalog'), icon: 'book-open' },
     { id: 'settings', label: t('nav.settings'), icon: 'settings' },
   ];
@@ -70,7 +72,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const handleNavClick = (item: NavItem) => {
     if (item.id === 'downloads') {
       setIsDownloadsExpanded(!isDownloadsExpanded);
-      // Always call onNavigate to let parent decide
       onNavigate('downloads');
     } else {
       onNavigate(item.id);
@@ -164,7 +165,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
         </div>
         
         <div className="sidebar-version">
-          TorrentHunt v1.1.0
+          TorrentHunt v1.3.5
         </div>
       </div>
     </aside>

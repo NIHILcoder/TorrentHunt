@@ -1,3 +1,5 @@
+/* SettingsBackup.css — TorrentHunt Design System 2.0 */
+
 .settings-backup {
   display: flex;
   flex-direction: column;
@@ -9,26 +11,33 @@
   align-items: center;
   gap: 20px;
   padding: 20px;
-  background: rgba(255, 255, 255, 0.05);
-  border: 1px solid var(--border-color);
-  border-radius: 12px;
-  transition: all 0.2s;
+  background: var(--color-bg-tertiary);
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-lg);
+  transition: all var(--transition-normal);
+}
+
+[data-theme="light"] .backup-card {
+  background: var(--color-bg-secondary);
+  border-color: var(--color-border-default);
 }
 
 .backup-card:hover {
-  background: rgba(255, 255, 255, 0.08);
-  border-color: rgba(96, 165, 250, 0.3);
+  background: var(--color-bg-elevated);
+  border-color: var(--color-border-strong);
+  box-shadow: var(--shadow-sm);
 }
 
 .backup-icon {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 64px;
-  height: 64px;
-  border-radius: 12px;
-  background: rgba(96, 165, 250, 0.1);
-  color: var(--primary-color);
+  width: 60px;
+  height: 60px;
+  border-radius: var(--radius-lg);
+  background: var(--color-accent-bg);
+  border: 1px solid var(--color-border-default);
+  color: var(--color-text-secondary);
   flex-shrink: 0;
 }
 
@@ -38,65 +47,75 @@
 }
 
 .backup-info h3 {
-  margin: 0 0 6px 0;
-  font-size: 16px;
-  font-weight: 600;
-  color: var(--text-primary);
+  margin: 0 0 5px 0;
+  font-size: var(--font-size-md);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-text-primary);
+  letter-spacing: -0.01em;
 }
 
 .backup-info p {
   margin: 0;
-  font-size: 13px;
-  color: var(--text-secondary);
-  line-height: 1.5;
+  font-size: var(--font-size-sm);
+  color: var(--color-text-tertiary);
+  line-height: var(--line-height-normal);
 }
 
 .btn-backup {
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 10px 20px;
-  background: var(--primary-color);
-  border: none;
-  border-radius: 8px;
-  color: white;
-  font-size: 14px;
-  font-weight: 500;
+  padding: 9px 18px;
+  background: var(--color-bg-elevated);
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-md);
+  color: var(--color-text-primary);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
+  font-family: var(--font-family);
   cursor: pointer;
-  transition: all 0.2s;
+  transition: all var(--transition-fast);
   white-space: nowrap;
   flex-shrink: 0;
 }
 
 .btn-backup:hover {
-  background: rgba(96, 165, 250, 0.9);
+  background: var(--color-bg-hover);
+  border-color: var(--color-accent-primary);
   transform: translateY(-1px);
+  box-shadow: var(--shadow-sm);
 }
 
 .btn-backup.secondary {
-  background: rgba(96, 165, 250, 0.1);
-  border: 1px solid var(--primary-color);
-  color: var(--primary-color);
+  background: transparent;
+  border-color: var(--color-border-default);
+  color: var(--color-text-secondary);
 }
 
 .btn-backup.secondary:hover {
-  background: rgba(96, 165, 250, 0.2);
+  background: var(--color-bg-hover);
+  border-color: var(--color-border-strong);
+  color: var(--color-text-primary);
 }
 
 .backup-notice {
   display: flex;
   align-items: flex-start;
   gap: 12px;
-  padding: 12px 16px;
-  background: rgba(59, 130, 246, 0.1);
-  border: 1px solid rgba(59, 130, 246, 0.2);
-  border-radius: 8px;
+  padding: 12px 14px;
+  background: var(--color-info-bg);
+  border: 1px solid var(--color-border-default);
+  border-radius: var(--radius-lg);
+}
+
+[data-theme="light"] .backup-notice {
+  background: rgba(0, 0, 0, 0.04);
 }
 
 .backup-notice span {
-  font-size: 13px;
-  color: var(--text-secondary);
-  line-height: 1.5;
+  font-size: var(--font-size-sm);
+  color: var(--color-text-tertiary);
+  line-height: var(--line-height-normal);
 }
 
 @media (max-width: 768px) {

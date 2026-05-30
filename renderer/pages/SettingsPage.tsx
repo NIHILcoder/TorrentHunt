@@ -84,6 +84,15 @@ const SettingsPage: React.FC = () => {
   const [portMin, setPortMin] = useState(6881);
   const [portMax, setPortMax] = useState(6889);
 
+  // Watch folder settings
+  const [watchFolderEnabled, setWatchFolderEnabled] = useState(false);
+  const [watchFolderPath, setWatchFolderPath] = useState('');
+  const [watchFolderDeleteAfterAdd, setWatchFolderDeleteAfterAdd] = useState(false);
+
+  // Default seeding limits
+  const [defaultSeedRatioLimit, setDefaultSeedRatioLimit] = useState(0);
+  const [defaultSeedTimeLimitMinutes, setDefaultSeedTimeLimitMinutes] = useState(0);
+
   // Scheduler state
   const [schedulerConfig, setSchedulerConfig] = useState<SchedulerConfig | null>(null);
   const [schedulerEnabled, setSchedulerEnabled] = useState(false);
@@ -220,6 +229,15 @@ const SettingsPage: React.FC = () => {
       setProxyUsername(s.proxyUsername ?? '');
       setProxyPassword(s.proxyPassword ?? '');
 
+      // Watch folder
+      setWatchFolderEnabled(s.watchFolderEnabled ?? false);
+      setWatchFolderPath(s.watchFolderPath ?? '');
+      setWatchFolderDeleteAfterAdd(s.watchFolderDeleteAfterAdd ?? false);
+
+      // Default seeding limits
+      setDefaultSeedRatioLimit(s.defaultSeedRatioLimit ?? 0);
+      setDefaultSeedTimeLimitMinutes(s.defaultSeedTimeLimitMinutes ?? 0);
+
       const scheduler = await window.api.getScheduler();
       setSchedulerConfig(scheduler);
       setSchedulerEnabled(scheduler.enabled);
@@ -315,7 +333,21 @@ const SettingsPage: React.FC = () => {
         proxyPort,
         proxyUsername,
         proxyPassword,
+        // Watch folder
+        watchFolderEnabled,
+        watchFolderPath,
+        watchFolderDeleteAfterAdd,
+        // Seeding limits
+        defaultSeedRatioLimit,
+        defaultSeedTimeLimitMinutes,
       });
+
+      // Apply watch folder change immediately
+      try {
+        if (window.api.setWatchFolder) {
+          await window.api.setWatchFolder(watchFolderPath, watchFolderEnabled, watchFolderDeleteAfterAdd);
+        }
+      } catch (e) { /* non-critical */ }
 
       if (autoLaunch !== await window.api.getAutoLaunch()) {
         await window.api.setAutoLaunch(autoLaunch);
@@ -377,19 +409,45 @@ const SettingsPage: React.FC = () => {
     minimizeToTray: boolean;
     closeToTray: boolean;
   }) => {
+    // Auto-launch: save immediately via Electron API
     if (systemSettings.autoLaunch !== autoLaunch) {
       try {
         await window.api.setAutoLaunch(systemSettings.autoLaunch);
         setAutoLaunch(systemSettings.autoLaunch);
+        setMessage({ type: 'success', text: systemSettings.autoLaunch ? 'Auto-launch enabled' : 'Auto-launch disabled' });
       } catch (error) {
         console.error('Failed to update auto launch:', error);
-        setMessage({ type: 'error', text: 'Failed to update auto launch setting' });
+        setMessage({ type: 'error', text: 'Failed to update auto-launch setting' });
       }
     }
-    
+
+    // Minimize to tray: save immediately (takes effect on next minimize)
+    if (systemSettings.minimizeToTray !== minimizeToTray) {
+      try {
+        await window.api.setMinimizeToTray(systemSettings.minimizeToTray);
+        setMinimizeToTray(systemSettings.minimizeToTray);
+      } catch (error) {
+        console.error('Failed to update minimize-to-tray:', error);
+      }
+    }
+
+    // Close to tray: save immediately (takes effect on next window close)
+    if (systemSettings.closeToTray !== closeToTray) {
+      try {
+        await window.api.setCloseToTray(systemSettings.closeToTray);
+        setCloseToTray(systemSettings.closeToTray);
+        setMessage({
+          type: 'success',
+          text: systemSettings.closeToTray
+            ? 'Background mode enabled — app keeps running after closing'
+            : 'Background mode disabled — app will quit on close',
+        });
+      } catch (error) {
+        console.error('Failed to update close-to-tray:', error);
+      }
+    }
+
     setAutoUpdate(systemSettings.autoUpdate);
-    setMinimizeToTray(systemSettings.minimizeToTray);
-    setCloseToTray(systemSettings.closeToTray);
   };
 
   const handleSetDefaultClient = async () => {
@@ -654,7 +712,7 @@ const SettingsPage: React.FC = () => {
       <>
         <div className="settings-category-header">
           <h1 className="settings-category-title">Downloads</h1>
-          <p className="settings-category-subtitle">Manage download location and behavior</p>
+          <p className="settings-category-subtitle">Manage download location, limits and watch folder</p>
         </div>
 
         <div className="settings-group">
@@ -684,6 +742,60 @@ const SettingsPage: React.FC = () => {
               value={maxActiveDownloads}
               onChange={(e) => setMaxActiveDownloads(parseInt(e.target.value) || 3)}
             />
+          )}
+        </div>
+
+        <div className="settings-divider" />
+
+        {/* Watch Folder */}
+        <div className="settings-group">
+          <h3 className="settings-group-title">WATCH FOLDER</h3>
+          {renderSettingItem(
+            'Enable Watch Folder',
+            'Automatically add .torrent files dropped into a folder',
+            <button
+              className={`toggle-switch ${watchFolderEnabled ? 'active' : ''}`}
+              onClick={() => setWatchFolderEnabled(!watchFolderEnabled)}
+            >
+              <span className="toggle-slider" />
+            </button>
+          )}
+
+          {watchFolderEnabled && (
+            <>
+              {renderSettingItem(
+                'Watch Folder Path',
+                'Folder to monitor for .torrent files',
+                <div className="path-input-row">
+                  <input
+                    type="text"
+                    className="input-compact input-path"
+                    placeholder="e.g. C:\Downloads\Watch"
+                    value={watchFolderPath}
+                    onChange={e => setWatchFolderPath(e.target.value)}
+                  />
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    icon={<Icon name="folder-open" size={14} />}
+                    onClick={async () => {
+                      const p = await window.api.selectDirectory();
+                      if (p) setWatchFolderPath(p);
+                    }}
+                  />
+                </div>
+              )}
+              {renderSettingItem(
+                'Delete .torrent After Adding',
+                'Remove the .torrent file after it has been added to the queue',
+                <button
+                  className={`toggle-switch ${watchFolderDeleteAfterAdd ? 'active' : ''}`}
+                  onClick={() => setWatchFolderDeleteAfterAdd(!watchFolderDeleteAfterAdd)}
+                >
+                  <span className="toggle-slider" />
+                </button>
+              )}
+            </>
           )}
         </div>
       </>
@@ -997,8 +1109,73 @@ const SettingsPage: React.FC = () => {
   }
 
   function renderSeedingSettings() {
-    return <SeedingDashboard />;
+    return (
+      <>
+        <div className="settings-category-header">
+          <h1 className="settings-category-title">Seeding</h1>
+          <p className="settings-category-subtitle">Control ratio and time limits for all torrents</p>
+        </div>
+
+        <div className="settings-group">
+          <h3 className="settings-group-title">DEFAULT SEEDING LIMITS</h3>
+          <p className="settings-group-desc">
+            These apply globally. Per-torrent limits can be set in the download context menu.
+          </p>
+
+          {renderSettingItem(
+            'Seed Ratio Limit',
+            'Stop seeding when ratio reaches this value (0 = unlimited)',
+            <div className="speed-input-compact">
+              <input
+                type="number"
+                className="input-compact input-mono"
+                min="0"
+                step="0.1"
+                placeholder="0"
+                value={defaultSeedRatioLimit}
+                onChange={e => setDefaultSeedRatioLimit(parseFloat(e.target.value) || 0)}
+              />
+              <span className="input-unit">ratio</span>
+            </div>
+          )}
+
+          {renderSettingItem(
+            'Seed Time Limit',
+            'Stop seeding after this many minutes (0 = unlimited)',
+            <div className="speed-input-compact">
+              <input
+                type="number"
+                className="input-compact input-mono"
+                min="0"
+                step="5"
+                placeholder="0"
+                value={defaultSeedTimeLimitMinutes}
+                onChange={e => setDefaultSeedTimeLimitMinutes(parseInt(e.target.value) || 0)}
+              />
+              <span className="input-unit">min</span>
+            </div>
+          )}
+
+          {(defaultSeedRatioLimit > 0 || defaultSeedTimeLimitMinutes > 0) && (
+            <div className="setting-info-box">
+              <Icon name="info" size={14} />
+              <span>
+                Seeding will stop when{' '}
+                {defaultSeedRatioLimit > 0 && <><strong>ratio ≥ {defaultSeedRatioLimit}</strong></>}
+                {defaultSeedRatioLimit > 0 && defaultSeedTimeLimitMinutes > 0 && ' or '}
+                {defaultSeedTimeLimitMinutes > 0 && <><strong>{defaultSeedTimeLimitMinutes} min elapsed</strong></>}
+              </span>
+            </div>
+          )}
+        </div>
+
+        <div className="settings-divider" />
+
+        <SeedingDashboard />
+      </>
+    );
   }
+
 
   function renderInterfaceSettings() {
     return (

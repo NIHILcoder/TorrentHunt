@@ -27,10 +27,18 @@ export interface Download {
   etaSeconds: number | null;
   peers: number;
   seeds: number;
-  totalSize: number; // Total size in bytes
+  totalSize: number;
   priority: number; // 0 = low, 1 = normal, 2 = high
-  category: string | null; // Category ID
-  selectedFiles?: number[]; // Indices of files selected for download (persisted for resume)
+  category: string | null;
+  selectedFiles?: number[];
+  // Priority 1 new fields
+  sequentialDownload?: boolean;
+  seedRatioLimit?: number;           // Stop seeding at this ratio (0 = unlimited)
+  seedTimeLimitMinutes?: number;     // Stop seeding after N minutes (0 = unlimited)
+  seedingStartedAt?: number;         // Unix timestamp when seeding began
+  maxDownloadSpeed?: number;         // Per-torrent KB/s (0 = unlimited)
+  maxUploadSpeed?: number;           // Per-torrent KB/s (0 = unlimited)
+  filePriorities?: FilePriority[];   // Per-file priorities, indexed by file index
   createdAt: Date;
   updatedAt: Date;
   lastError: string | null;
@@ -49,6 +57,17 @@ export interface TorrentFile {
   length: number;
   downloaded: number;
   progress: number;
+  index?: number;
+  priority?: FilePriority;
+}
+
+export type FilePriority = 'skip' | 'low' | 'normal' | 'high';
+
+export interface TrackerInfo {
+  url: string;
+  status: 'connected' | 'disconnected' | 'error';
+  peers: number;
+  lastAnnounce?: string;
 }
 
 export interface DownloadStats {
@@ -88,6 +107,13 @@ export interface AppSettings {
   proxyPort: number;
   proxyUsername: string;
   proxyPassword: string;
+  // Watch folder
+  watchFolderEnabled: boolean;
+  watchFolderPath: string;
+  watchFolderDeleteAfterAdd: boolean;
+  // Default seeding limits
+  defaultSeedRatioLimit: number;     // 0 = unlimited
+  defaultSeedTimeLimitMinutes: number; // 0 = unlimited
   updatedAt: Date;
 }
 
@@ -228,9 +254,9 @@ export interface Badge {
 export interface AddDownloadRequest {
   sourceType: SourceType;
   sourceUri: string;
-  savePath?: string; // Override default download directory
+  savePath?: string;
   name?: string;
-  selectedFiles?: number[]; // Indices of files to download (for selective download)
+  selectedFiles?: number[];
 }
 
 export interface TorrentInfo {
@@ -242,6 +268,63 @@ export interface TorrentInfo {
   }[];
   totalSize: number;
 }
+
+// RSS types
+export interface RSSFeed {
+  id: string;
+  name: string;
+  url: string;
+  enabled: boolean;
+  autoDownload: boolean;
+  filter?: string;              // Regex filter for item names
+  lastChecked?: string;         // ISO date string
+  intervalMinutes: number;      // Check interval
+  savePath?: string;            // Override default save path
+}
+
+export interface RSSItem {
+  guid: string;
+  title: string;
+  link: string;                 // Magnet or torrent URL
+  pubDate?: string;
+  downloaded: boolean;
+  size?: number;
+  feedId: string;
+}
+
+// Search types
+export interface SearchProvider {
+  id: string;
+  name: string;
+  url: string;                  // Jackett base URL or custom API URL
+  apiKey?: string;
+  enabled: boolean;
+  type: 'jackett' | 'torznab' | 'custom';
+}
+
+export interface SearchResult {
+  title: string;
+  magnetUri?: string;
+  torrentUrl?: string;
+  size: number;
+  seeds: number;
+  leechers: number;
+  provider: string;
+  publishDate?: string;
+  category?: string;
+  infoHash?: string;
+}
+
+// IP Blocklist types
+export interface IPBlocklist {
+  id: string;
+  name: string;
+  url: string;
+  enabled: boolean;
+  lastUpdated?: string;         // ISO date string
+  entryCount?: number;
+}
+
 
 export interface IpcApi {
   // Downloads
@@ -263,16 +346,31 @@ export interface IpcApi {
     activeDownloads: number;
     completedDownloads: number;
   }>;
+  // Priority 1: new torrent controls
+  setSequentialDownload: (id: string, enabled: boolean) => Promise<void>;
+  setFilePriority: (id: string, fileIndex: number, priority: FilePriority) => Promise<void>;
+  setTorrentSpeedLimits: (id: string, downKbps: number, upKbps: number) => Promise<void>;
+  setSeedRatioLimit: (id: string, ratio: number) => Promise<void>;
+  setSeedTimeLimit: (id: string, minutes: number) => Promise<void>;
+  // Tracker management
+  getTrackers: (id: string) => Promise<TrackerInfo[]>;
+  addTracker: (id: string, url: string) => Promise<void>;
+  removeTracker: (id: string, url: string) => Promise<void>;
 
   // Settings
   getSettings: () => Promise<AppSettings>;
   updateSettings: (settings: Partial<AppSettings>) => Promise<AppSettings>;
   exportSettings: () => Promise<{ success: boolean; path?: string }>;
   importSettings: () => Promise<{ success: boolean }>;
+  // Watch folder
+  getWatchFolderStatus: () => Promise<{ active: boolean; path: string }>;
+  setWatchFolder: (path: string, enabled: boolean, deleteAfterAdd: boolean) => Promise<void>;
 
   // System
   getAutoLaunch: () => Promise<boolean>;
   setAutoLaunch: (enabled: boolean) => Promise<{ success: boolean }>;
+  setCloseToTray: (enabled: boolean) => Promise<{ success: boolean }>;
+  setMinimizeToTray: (enabled: boolean) => Promise<{ success: boolean }>;
   isDefaultClient: () => Promise<boolean>;
   setDefaultClient: () => Promise<{ success: boolean }>;
 
@@ -334,6 +432,40 @@ export interface IpcApi {
 
   // App events
   onOpenTorrent: (callback: (torrentUri: string) => void) => () => void;
+  // Tray events from main
+  onPauseAll: (callback: () => void) => () => void;
+  onResumeAll: (callback: () => void) => () => void;
+
+  // RSS
+  rss: {
+    getFeeds: () => Promise<RSSFeed[]>;
+    addFeed: (feed: Omit<RSSFeed, 'id'>) => Promise<RSSFeed>;
+    updateFeed: (id: string, updates: Partial<RSSFeed>) => Promise<RSSFeed>;
+    removeFeed: (id: string) => Promise<void>;
+    checkFeed: (id: string) => Promise<RSSItem[]>;
+    checkAll: () => Promise<void>;
+    getItems: (feedId: string) => Promise<RSSItem[]>;
+    markDownloaded: (guid: string) => Promise<void>;
+  };
+
+  // Search
+  search: {
+    query: (query: string, category?: string) => Promise<SearchResult[]>;
+    getProviders: () => Promise<SearchProvider[]>;
+    addProvider: (provider: Omit<SearchProvider, 'id'>) => Promise<SearchProvider>;
+    updateProvider: (id: string, updates: Partial<SearchProvider>) => Promise<SearchProvider>;
+    removeProvider: (id: string) => Promise<void>;
+    testProvider: (id: string) => Promise<{ success: boolean; message: string }>;
+  };
+
+  // IP Blocklist
+  blocklist: {
+    getAll: () => Promise<IPBlocklist[]>;
+    add: (name: string, url: string) => Promise<IPBlocklist>;
+    remove: (id: string) => Promise<void>;
+    update: (id: string) => Promise<{ entryCount: number }>;
+    setEnabled: (id: string, enabled: boolean) => Promise<void>;
+  };
 
   // Dialog API
   dialog: {

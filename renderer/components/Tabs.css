@@ -1,6 +1,6 @@
 .tabs-container {
   margin-bottom: 24px;
-  border-bottom: 1px solid var(--border-color);
+  border-bottom: 1px solid var(--color-border-subtle);
 }
 
 .tabs-list {
@@ -23,7 +23,7 @@
   background: transparent;
   border: none;
   border-bottom: 2px solid transparent;
-  color: var(--text-secondary);
+  color: var(--color-text-tertiary);
   font-size: 14px;
   font-weight: 500;
   cursor: pointer;
@@ -33,13 +33,13 @@
 }
 
 .tab-button:hover {
-  color: var(--text-primary);
-  background: rgba(255, 255, 255, 0.05);
+  color: var(--color-text-primary);
+  background: var(--color-bg-hover);
 }
 
 .tab-button.active {
-  color: var(--primary-color);
-  border-bottom-color: var(--primary-color);
+  color: var(--color-text-primary);
+  border-bottom-color: var(--color-accent-primary);
 }
 
 .tab-icon {

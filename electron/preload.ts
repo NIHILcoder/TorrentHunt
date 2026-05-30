@@ -246,6 +246,14 @@ const api: IpcApi = {
     return ipcRenderer.invoke('app:getAutoLaunch');
   },
 
+  setCloseToTray: (enabled: boolean): Promise<{ success: boolean }> => {
+    return ipcRenderer.invoke('app:setCloseToTray', enabled);
+  },
+
+  setMinimizeToTray: (enabled: boolean): Promise<{ success: boolean }> => {
+    return ipcRenderer.invoke('app:setMinimizeToTray', enabled);
+  },
+
   // Default client
   isDefaultClient: (): Promise<boolean> => {
     return ipcRenderer.invoke('app:isDefaultClient');
@@ -266,17 +274,88 @@ const api: IpcApi = {
 
   // App events
   onOpenTorrent: (callback: (torrentUri: string) => void): (() => void) => {
-    const handler = (_event: IpcRendererEvent, uri: string) => {
-      callback(uri);
-    };
-
+    const handler = (_event: IpcRendererEvent, uri: string) => { callback(uri); };
     ipcRenderer.on('app:openTorrent', handler);
+    return () => { ipcRenderer.removeListener('app:openTorrent', handler); };
+  },
 
-    return () => {
-      ipcRenderer.removeListener('app:openTorrent', handler);
-    };
+  onPauseAll: (callback: () => void): (() => void) => {
+    const handler = () => callback();
+    ipcRenderer.on('app:pauseAll', handler);
+    return () => { ipcRenderer.removeListener('app:pauseAll', handler); };
+  },
+
+  onResumeAll: (callback: () => void): (() => void) => {
+    const handler = () => callback();
+    ipcRenderer.on('app:resumeAll', handler);
+    return () => { ipcRenderer.removeListener('app:resumeAll', handler); };
+  },
+
+  // Priority 1: New torrent controls
+  setSequentialDownload: (id: string, enabled: boolean) =>
+    ipcRenderer.invoke('downloads:setSequential', id, enabled),
+
+  setFilePriority: (id: string, fileIndex: number, priority: string) =>
+    ipcRenderer.invoke('downloads:setFilePriority', id, fileIndex, priority),
+
+  setTorrentSpeedLimits: (id: string, downKbps: number, upKbps: number) =>
+    ipcRenderer.invoke('downloads:setSpeedLimits', id, downKbps, upKbps),
+
+  setSeedRatioLimit: (id: string, ratio: number) =>
+    ipcRenderer.invoke('downloads:setSeedRatio', id, ratio),
+
+  setSeedTimeLimit: (id: string, minutes: number) =>
+    ipcRenderer.invoke('downloads:setSeedTime', id, minutes),
+
+  // Tracker management
+  getTrackers: (id: string) =>
+    ipcRenderer.invoke('downloads:getTrackers', id),
+
+  addTracker: (id: string, url: string) =>
+    ipcRenderer.invoke('downloads:addTracker', id, url),
+
+  removeTracker: (id: string, url: string) =>
+    ipcRenderer.invoke('downloads:removeTracker', id, url),
+
+  // Watch folder
+  getWatchFolderStatus: () =>
+    ipcRenderer.invoke('watchFolder:getStatus'),
+
+  setWatchFolder: (folderPath: string, enabled: boolean, deleteAfterAdd: boolean) =>
+    ipcRenderer.invoke('watchFolder:set', folderPath, enabled, deleteAfterAdd),
+
+  // Priority 2: RSS
+  rss: {
+    getFeeds: () => ipcRenderer.invoke('rss:getFeeds'),
+    addFeed: (feed: any) => ipcRenderer.invoke('rss:addFeed', feed),
+    updateFeed: (id: string, updates: any) => ipcRenderer.invoke('rss:updateFeed', id, updates),
+    removeFeed: (id: string) => ipcRenderer.invoke('rss:removeFeed', id),
+    checkFeed: (id: string) => ipcRenderer.invoke('rss:checkFeed', id),
+    checkAll: () => ipcRenderer.invoke('rss:checkAll'),
+    getItems: (feedId: string) => ipcRenderer.invoke('rss:getItems', feedId),
+    markDownloaded: (guid: string) => ipcRenderer.invoke('rss:markDownloaded', guid),
+  },
+
+  // Priority 2: Search
+  search: {
+    query: (query: string, category?: string) => ipcRenderer.invoke('search:query', query, category),
+    getProviders: () => ipcRenderer.invoke('search:getProviders'),
+    addProvider: (provider: any) => ipcRenderer.invoke('search:addProvider', provider),
+    updateProvider: (id: string, updates: any) => ipcRenderer.invoke('search:updateProvider', id, updates),
+    removeProvider: (id: string) => ipcRenderer.invoke('search:removeProvider', id),
+    testProvider: (id: string) => ipcRenderer.invoke('search:testProvider', id),
+  },
+
+  // Priority 2: IP Blocklist
+  blocklist: {
+    getAll: () => ipcRenderer.invoke('blocklist:getAll'),
+    add: (name: string, url: string) => ipcRenderer.invoke('blocklist:add', name, url),
+    remove: (id: string) => ipcRenderer.invoke('blocklist:remove', id),
+    update: (id: string) => ipcRenderer.invoke('blocklist:update', id),
+    setEnabled: (id: string, enabled: boolean) => ipcRenderer.invoke('blocklist:setEnabled', id, enabled),
   },
 };
 
 // Expose the API to the renderer process
 contextBridge.exposeInMainWorld('api', api);
+

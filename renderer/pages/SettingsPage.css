@@ -579,3 +579,44 @@
     margin: 24px 0;
   }
 }
+
+/* === New P1/P2 Utility Styles === */
+
+.settings-group-desc {
+  font-size: 12px;
+  color: var(--color-text-secondary);
+  line-height: 1.5;
+  margin: 0 0 12px 0;
+}
+
+.setting-info-box {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+  padding: 8px 12px;
+  background: rgba(96, 165, 250, 0.08);
+  border: 1px solid rgba(96, 165, 250, 0.2);
+  border-radius: var(--radius-md);
+  font-size: 12px;
+  color: var(--color-text-secondary);
+}
+
+.setting-info-box svg {
+  flex-shrink: 0;
+  color: #60a5fa;
+}
+
+.path-input-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.input-path {
+  width: 220px;
+  padding: 0 10px;
+  font-family: var(--font-family-mono);
+  font-size: 12px;
+}
+

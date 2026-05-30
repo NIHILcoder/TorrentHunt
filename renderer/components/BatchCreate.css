@@ -1,50 +1,72 @@
-/* Batch Create Styles */
+/* ============================================================
+   Batch Create Modal — TorrentHunt Design System 2.0
+   Fully theme-aware (dark / light), premium look & feel.
+   ============================================================ */
 
+/* ---------- Overlay ---------- */
 .batch-create-overlay {
   position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: rgba(0, 0, 0, 0.6);
-  backdrop-filter: blur(4px);
+  inset: 0;
+  background: rgba(0, 0, 0, 0.72);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
   display: flex;
   align-items: center;
   justify-content: center;
-  z-index: 1000;
-  animation: fadeIn 0.2s ease;
+  z-index: var(--z-modal);
+  animation: bc-fade-in 0.2s ease;
 }
 
+[data-theme="light"] .batch-create-overlay {
+  background: rgba(0, 0, 0, 0.45);
+}
+
+/* ---------- Modal shell ---------- */
 .batch-create-modal {
-  background: var(--bg-primary);
-  border-radius: 12px;
-  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.4);
+  background: var(--color-bg-secondary);
+  border: 1px solid var(--color-border-default);
+  border-radius: var(--radius-xl);
+  box-shadow: var(--shadow-xl), 0 0 0 1px var(--color-border-subtle);
   width: 90%;
   max-width: 800px;
   max-height: 85vh;
   display: flex;
   flex-direction: column;
-  animation: slideUp 0.3s ease;
+  overflow: hidden;
+  animation: bc-slide-up 0.3s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
+[data-theme="light"] .batch-create-modal {
+  background: var(--color-bg-elevated);
+}
+
+/* ---------- Header ---------- */
 .batch-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 20px 24px;
-  border-bottom: 1px solid var(--border-color);
+  padding: 20px 24px 18px;
+  border-bottom: 1px solid var(--color-border-subtle);
+  background: linear-gradient(180deg, var(--color-bg-tertiary) 0%, transparent 100%);
+  flex-shrink: 0;
+}
+
+[data-theme="light"] .batch-header {
+  background: linear-gradient(180deg, var(--color-bg-secondary) 0%, transparent 100%);
 }
 
 .batch-header h3 {
   display: flex;
   align-items: center;
   gap: 10px;
-  font-size: 18px;
-  font-weight: 600;
-  color: var(--text-primary);
+  font-size: var(--font-size-lg);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-text-primary);
   margin: 0;
+  letter-spacing: -0.01em;
 }
 
+/* ---------- Body ---------- */
 .batch-content {
   padding: 20px 24px;
   overflow-y: auto;
@@ -52,44 +74,72 @@
   display: flex;
   flex-direction: column;
   gap: 16px;
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-border-strong) transparent;
 }
 
+.batch-content::-webkit-scrollbar { width: 5px; }
+.batch-content::-webkit-scrollbar-track { background: transparent; }
+.batch-content::-webkit-scrollbar-thumb {
+  background: var(--color-border-strong);
+  border-radius: 3px;
+}
+.batch-content::-webkit-scrollbar-thumb:hover {
+  background: var(--color-text-disabled);
+}
+
+/* ---------- Stats row ---------- */
 .batch-stats {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-  gap: 12px;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 10px;
 }
 
 .stat-card {
   display: flex;
   align-items: center;
   gap: 12px;
-  padding: 12px 16px;
-  background: var(--bg-secondary);
-  border: 1px solid var(--border-color);
-  border-radius: 8px;
+  padding: 12px 14px;
+  background: var(--color-bg-tertiary);
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-lg);
+  transition: border-color var(--transition-fast);
+}
+
+[data-theme="light"] .stat-card {
+  background: var(--color-bg-secondary);
+  border-color: var(--color-border-default);
 }
 
 .stat-card.success {
-  background: var(--success-color-alpha);
-  border-color: var(--success-color);
+  background: var(--color-success-bg);
+  border-color: rgba(226, 226, 226, 0.25);
 }
 
 .stat-card.success svg {
-  color: var(--success-color);
+  color: var(--color-success);
+}
+
+[data-theme="light"] .stat-card.success {
+  background: rgba(22, 163, 74, 0.08);
+  border-color: rgba(22, 163, 74, 0.25);
+}
+
+[data-theme="light"] .stat-card.success svg {
+  color: #16a34a;
 }
 
 .stat-card.error {
-  background: var(--danger-color-alpha);
-  border-color: var(--danger-color);
+  background: var(--color-error-bg);
+  border-color: rgba(245, 101, 101, 0.25);
 }
 
 .stat-card.error svg {
-  color: var(--danger-color);
+  color: var(--color-error);
 }
 
 .stat-card svg {
-  color: var(--text-secondary);
+  color: var(--color-text-tertiary);
   flex-shrink: 0;
 }
 
@@ -100,25 +150,28 @@
 }
 
 .stat-label {
-  font-size: 11px;
-  color: var(--text-tertiary);
-  font-weight: 500;
+  font-size: var(--font-size-xs);
+  color: var(--color-text-disabled);
+  font-weight: var(--font-weight-semibold);
   text-transform: uppercase;
-  letter-spacing: 0.5px;
+  letter-spacing: 0.06em;
 }
 
 .stat-value {
-  font-size: 18px;
-  font-weight: 700;
-  color: var(--text-primary);
+  font-size: var(--font-size-xl);
+  font-weight: var(--font-weight-bold);
+  color: var(--color-text-primary);
+  line-height: 1;
 }
 
+/* ---------- Actions ---------- */
 .batch-actions {
   display: flex;
   gap: 8px;
   flex-wrap: wrap;
 }
 
+/* ---------- Empty state ---------- */
 .batch-empty {
   display: flex;
   flex-direction: column;
@@ -127,96 +180,131 @@
   gap: 12px;
   padding: 60px 20px;
   text-align: center;
-  color: var(--text-secondary);
+  color: var(--color-text-tertiary);
   flex: 1;
 }
 
 .batch-empty svg {
-  opacity: 0.5;
+  opacity: 0.4;
+  color: var(--color-text-disabled);
 }
 
 .batch-empty h4 {
   margin: 0;
-  font-size: 16px;
-  color: var(--text-primary);
+  font-size: var(--font-size-md);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-text-secondary);
 }
 
 .batch-empty p {
   margin: 0;
-  font-size: 13px;
+  font-size: var(--font-size-sm);
   max-width: 300px;
+  line-height: var(--line-height-normal);
 }
 
+/* ---------- Items list ---------- */
 .batch-list {
   display: flex;
   flex-direction: column;
   gap: 8px;
   overflow-y: auto;
   flex: 1;
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-border-strong) transparent;
+}
+
+.batch-list::-webkit-scrollbar { width: 5px; }
+.batch-list::-webkit-scrollbar-track { background: transparent; }
+.batch-list::-webkit-scrollbar-thumb {
+  background: var(--color-border-strong);
+  border-radius: 3px;
 }
 
 .batch-item {
   display: flex;
   align-items: center;
   gap: 12px;
-  padding: 12px 16px;
-  background: var(--bg-secondary);
-  border: 1px solid var(--border-color);
-  border-radius: 8px;
-  transition: all 0.2s;
+  padding: 12px 14px;
+  background: var(--color-bg-tertiary);
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-lg);
+  transition: all var(--transition-fast);
+}
+
+[data-theme="light"] .batch-item {
+  background: var(--color-bg-secondary);
+  border-color: var(--color-border-default);
 }
 
 .batch-item.current {
-  border-color: var(--primary-color);
-  background: var(--primary-color-alpha);
+  border-color: var(--color-accent-primary);
+  background: var(--color-accent-bg);
 }
 
 .batch-item.completed {
-  border-color: var(--success-color);
-  background: var(--success-color-alpha);
+  border-color: rgba(226, 226, 226, 0.25);
+  background: var(--color-success-bg);
+}
+
+[data-theme="light"] .batch-item.completed {
+  border-color: rgba(22, 163, 74, 0.25);
+  background: rgba(22, 163, 74, 0.06);
 }
 
 .batch-item.failed {
-  border-color: var(--danger-color);
-  background: var(--danger-color-alpha);
+  border-color: rgba(245, 101, 101, 0.25);
+  background: var(--color-error-bg);
 }
 
+/* Item icon */
 .item-icon {
-  width: 40px;
-  height: 40px;
+  width: 38px;
+  height: 38px;
   display: flex;
   align-items: center;
   justify-content: center;
-  background: var(--bg-tertiary);
-  border-radius: 8px;
-  color: var(--text-secondary);
+  background: var(--color-bg-elevated);
+  border: 1px solid var(--color-border-default);
+  border-radius: var(--radius-md);
+  color: var(--color-text-tertiary);
   flex-shrink: 0;
+  transition: all var(--transition-fast);
+}
+
+[data-theme="light"] .item-icon {
+  background: var(--color-bg-tertiary);
 }
 
 .batch-item.processing .item-icon {
-  background: var(--primary-color-alpha);
-  color: var(--primary-color);
+  background: var(--color-accent-bg);
+  border-color: var(--color-accent-primary);
+  color: var(--color-accent-primary);
 }
 
 .batch-item.completed .item-icon {
-  background: var(--success-color);
-  color: white;
+  background: var(--color-success);
+  border-color: transparent;
+  color: var(--color-bg-primary);
+}
+
+[data-theme="light"] .batch-item.completed .item-icon {
+  background: #16a34a;
+  color: #ffffff;
 }
 
 .batch-item.failed .item-icon {
-  background: var(--danger-color);
-  color: white;
+  background: var(--color-error);
+  border-color: transparent;
+  color: #ffffff;
 }
 
+/* Spin animation */
 .spinning {
-  animation: spin 1s linear infinite;
+  animation: bc-spin 1s linear infinite;
 }
 
-@keyframes spin {
-  from { transform: rotate(0deg); }
-  to { transform: rotate(360deg); }
-}
-
+/* Item info */
 .item-info {
   display: flex;
   flex-direction: column;
@@ -233,9 +321,9 @@
 }
 
 .item-name {
-  font-size: 14px;
-  font-weight: 500;
-  color: var(--text-primary);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-medium);
+  color: var(--color-text-primary);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -243,9 +331,9 @@
 }
 
 .item-size {
-  font-size: 12px;
-  color: var(--text-secondary);
-  font-family: 'Consolas', 'Monaco', monospace;
+  font-size: var(--font-size-xs);
+  color: var(--color-text-tertiary);
+  font-family: var(--font-family-mono);
   flex-shrink: 0;
 }
 
@@ -260,10 +348,10 @@
 }
 
 .progress-text {
-  font-size: 11px;
-  font-weight: 600;
-  color: var(--primary-color);
-  font-family: 'Consolas', 'Monaco', monospace;
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-bold);
+  color: var(--color-text-secondary);
+  font-family: var(--font-family-mono);
   flex-shrink: 0;
   min-width: 35px;
   text-align: right;
@@ -274,64 +362,71 @@
   display: flex;
   align-items: center;
   gap: 6px;
-  font-size: 12px;
+  font-size: var(--font-size-xs);
 }
 
 .item-error {
-  color: var(--danger-color);
+  color: var(--color-error);
 }
 
 .item-success {
-  color: var(--success-color);
+  color: var(--color-success);
 }
 
+[data-theme="light"] .item-success {
+  color: #16a34a;
+}
+
+/* Remove button */
 .item-remove {
   width: 28px;
   height: 28px;
   display: flex;
   align-items: center;
   justify-content: center;
-  background: none;
-  border: none;
-  border-radius: 6px;
-  color: var(--text-secondary);
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: var(--radius-md);
+  color: var(--color-text-disabled);
   cursor: pointer;
-  transition: all 0.2s;
+  transition: all var(--transition-fast);
   flex-shrink: 0;
 }
 
 .item-remove:hover {
-  background: var(--danger-color-alpha);
-  color: var(--danger-color);
+  background: var(--color-error-bg);
+  border-color: rgba(245, 101, 101, 0.2);
+  color: var(--color-error);
 }
 
+/* ---------- Footer ---------- */
 .batch-footer {
   display: flex;
   align-items: center;
   justify-content: flex-end;
-  gap: 12px;
+  gap: 10px;
   padding: 16px 24px;
-  border-top: 1px solid var(--border-color);
+  border-top: 1px solid var(--color-border-subtle);
+  background: var(--color-bg-secondary);
+  flex-shrink: 0;
 }
 
-/* Scrollbar */
-.batch-content::-webkit-scrollbar,
-.batch-list::-webkit-scrollbar {
-  width: 8px;
+[data-theme="light"] .batch-footer {
+  background: var(--color-bg-secondary);
 }
 
-.batch-content::-webkit-scrollbar-track,
-.batch-list::-webkit-scrollbar-track {
-  background: var(--bg-secondary);
+/* ---------- Animations ---------- */
+@keyframes bc-fade-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
 }
 
-.batch-content::-webkit-scrollbar-thumb,
-.batch-list::-webkit-scrollbar-thumb {
-  background: var(--border-color);
-  border-radius: 4px;
+@keyframes bc-slide-up {
+  from { opacity: 0; transform: translateY(16px) scale(0.98); }
+  to   { opacity: 1; transform: translateY(0)    scale(1);    }
 }
 
-.batch-content::-webkit-scrollbar-thumb:hover,
-.batch-list::-webkit-scrollbar-thumb:hover {
-  background: var(--text-secondary);
+@keyframes bc-spin {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
 }

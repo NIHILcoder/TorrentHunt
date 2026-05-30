@@ -1,3 +1,5 @@
+/* AppStatistics.css — TorrentHunt Design System 2.0 */
+
 .app-statistics {
   padding: 20px 0;
 }
@@ -5,56 +7,68 @@
 .stats-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-  gap: 16px;
+  gap: 14px;
 }
 
-.stat-card {
+/* Note: .stat-card is also used in BatchCreate.css — keep selectors scoped */
+.app-statistics .stat-card {
   display: flex;
   align-items: center;
   gap: 12px;
   padding: 16px;
-  background: rgba(255, 255, 255, 0.05);
-  border: 1px solid var(--border-color);
-  border-radius: 12px;
-  transition: all 0.2s;
+  background: var(--color-bg-tertiary);
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-lg);
+  transition: all var(--transition-normal);
 }
 
-.stat-card:hover {
-  background: rgba(255, 255, 255, 0.08);
-  border-color: rgba(96, 165, 250, 0.3);
+[data-theme="light"] .app-statistics .stat-card {
+  background: var(--color-bg-secondary);
+  border-color: var(--color-border-default);
+}
+
+.app-statistics .stat-card:hover {
+  background: var(--color-bg-elevated);
+  border-color: var(--color-border-strong);
   transform: translateY(-2px);
+  box-shadow: var(--shadow-sm);
 }
 
 .stat-icon {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 44px;
-  height: 44px;
-  border-radius: 10px;
-  background: rgba(96, 165, 250, 0.1);
-  color: var(--primary-color);
+  width: 42px;
+  height: 42px;
+  border-radius: var(--radius-md);
+  background: var(--color-accent-bg);
+  border: 1px solid var(--color-border-default);
+  color: var(--color-text-secondary);
   flex-shrink: 0;
 }
 
-.stat-info {
+.app-statistics .stat-info {
   flex: 1;
   min-width: 0;
 }
 
-.stat-label {
-  font-size: 12px;
-  color: var(--text-secondary);
-  margin-bottom: 4px;
+.app-statistics .stat-label {
+  font-size: var(--font-size-xs);
+  color: var(--color-text-disabled);
+  font-weight: var(--font-weight-semibold);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: 3px;
 }
 
-.stat-value {
-  font-size: 18px;
-  font-weight: 600;
-  color: var(--text-primary);
+.app-statistics .stat-value {
+  font-size: var(--font-size-xl);
+  font-weight: var(--font-weight-bold);
+  color: var(--color-text-primary);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  line-height: 1;
 }
 
 @media (max-width: 768px) {

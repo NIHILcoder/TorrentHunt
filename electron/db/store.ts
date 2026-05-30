@@ -4,7 +4,7 @@
  */
 
 import Store from 'electron-store';
-import { Download, AppSettings, SourceType, Category, SchedulerConfig, UserReputation, ReputationTransaction, PrivacyConfig } from '../../shared/types';
+import { Download, AppSettings, SourceType, Category, SchedulerConfig, UserReputation, ReputationTransaction, PrivacyConfig, RSSFeed, RSSItem, SearchProvider, IPBlocklist } from '../../shared/types';
 import { v4 as uuidv4 } from 'uuid';
 import { app } from 'electron';
 import path from 'path';
@@ -17,6 +17,11 @@ interface StoreSchema {
   reputation: Record<string, UserReputation>;
   transactions: Record<string, ReputationTransaction[]>;
   privacyConfig: PrivacyConfig;
+  rssFeeds: RSSFeed[];
+  rssItems: RSSItem[];
+  searchProviders: SearchProvider[];
+  ipBlocklists: IPBlocklist[];
+  blocklistData: Record<string, string>; // id -> packed IP ranges as CSV
 }
 
 const defaultCategories: Category[] = [
@@ -54,6 +59,13 @@ const store = new Store<StoreSchema>({
       proxyPort: 8080,
       proxyUsername: '',
       proxyPassword: '',
+      // Watch folder
+      watchFolderEnabled: false,
+      watchFolderPath: '',
+      watchFolderDeleteAfterAdd: false,
+      // Seeding limits
+      defaultSeedRatioLimit: 0,
+      defaultSeedTimeLimitMinutes: 0,
       updatedAt: new Date(),
     },
     categories: defaultCategories,
@@ -72,8 +84,14 @@ const store = new Store<StoreSchema>({
       ephemeralPeerId: true,
       sanitizeLogs: true,
     },
+    rssFeeds: [],
+    rssItems: [],
+    searchProviders: [],
+    ipBlocklists: [],
+    blocklistData: {},
   },
 });
+
 
 // === Downloads ===
 
@@ -219,6 +237,41 @@ export async function deleteDownload(id: string): Promise<void> {
   delete downloads[id];
   store.set('downloads', downloads);
 }
+
+/**
+ * Generic field updater for a single download field.
+ * Used by Priority 1 features (sequential, speed limits, etc.)
+ */
+export async function updateDownloadField<K extends keyof Download>(
+  id: string,
+  field: K,
+  value: Download[K]
+): Promise<void> {
+  const downloads = store.get('downloads');
+  const download = downloads[id];
+  if (!download) throw new Error(`Download not found: ${id}`);
+  (download as any)[field] = value;
+  download.updatedAt = new Date();
+  downloads[id] = download;
+  store.set('downloads', downloads);
+}
+
+/**
+ * Bulk-update multiple fields on one download.
+ */
+export async function updateDownloadFields(
+  id: string,
+  fields: Partial<Download>
+): Promise<void> {
+  const downloads = store.get('downloads');
+  const download = downloads[id];
+  if (!download) throw new Error(`Download not found: ${id}`);
+  Object.assign(download, fields);
+  download.updatedAt = new Date();
+  downloads[id] = download;
+  store.set('downloads', downloads);
+}
+
 
 // === Settings ===
 
@@ -424,36 +477,141 @@ export async function updatePrivacyConfig(updates: Partial<PrivacyConfig>): Prom
 }
 
 export async function clearAllData(): Promise<void> {
-  // Clear all data except default settings
   store.clear();
-
-  // Reset to defaults
-  store.set('settings', {
-    id: 1,
-    defaultDownloadDir: path.join(app.getPath('downloads'), 'TorrentHunt'),
-    maxDownKbps: 0,
-    maxUpKbps: 0,
-    maxActiveDownloads: 3,
-    updatedAt: new Date(),
-  });
-
   store.set('categories', defaultCategories);
+  store.set('rssFeeds', []);
+  store.set('rssItems', []);
+  store.set('searchProviders', []);
+  store.set('ipBlocklists', []);
+  store.set('blocklistData', {});
+}
 
-  store.set('scheduler', {
-    enabled: false,
-    schedules: [],
-  });
+// === RSS Feeds ===
 
-  store.set('privacyConfig', {
-    anonymousMode: true,
-    encryptStorage: true,
-    disableLogs: false,
-    vpnCheck: true,
-    clearDataOnExit: false,
-    ephemeralPeerId: true,
-    sanitizeLogs: true,
-  });
+export async function getRSSFeeds(): Promise<RSSFeed[]> {
+  return store.get('rssFeeds') ?? [];
+}
+
+export async function addRSSFeed(feed: Omit<RSSFeed, 'id'>): Promise<RSSFeed> {
+  const feeds = store.get('rssFeeds') ?? [];
+  const newFeed: RSSFeed = { ...feed, id: uuidv4() };
+  feeds.push(newFeed);
+  store.set('rssFeeds', feeds);
+  return newFeed;
+}
+
+export async function updateRSSFeed(id: string, updates: Partial<RSSFeed>): Promise<RSSFeed> {
+  const feeds = store.get('rssFeeds') ?? [];
+  const idx = feeds.findIndex(f => f.id === id);
+  if (idx === -1) throw new Error(`RSS feed not found: ${id}`);
+  feeds[idx] = { ...feeds[idx], ...updates };
+  store.set('rssFeeds', feeds);
+  return feeds[idx];
+}
+
+export async function removeRSSFeed(id: string): Promise<void> {
+  const feeds = (store.get('rssFeeds') ?? []).filter((f: RSSFeed) => f.id !== id);
+  store.set('rssFeeds', feeds);
+  // Remove associated items
+  const items = (store.get('rssItems') ?? []).filter((i: RSSItem) => i.feedId !== id);
+  store.set('rssItems', items);
+}
+
+export async function getRSSItems(feedId?: string): Promise<RSSItem[]> {
+  const items: RSSItem[] = store.get('rssItems') ?? [];
+  return feedId ? items.filter(i => i.feedId === feedId) : items;
+}
+
+export async function saveRSSItems(items: RSSItem[]): Promise<void> {
+  const existing: RSSItem[] = store.get('rssItems') ?? [];
+  // Merge: only add new items (by guid)
+  const existingGuids = new Set(existing.map(i => i.guid));
+  const newItems = items.filter(i => !existingGuids.has(i.guid));
+  const merged = [...existing, ...newItems];
+  // Keep last 5000 items total
+  const trimmed = merged.slice(-5000);
+  store.set('rssItems', trimmed);
+}
+
+export async function markRSSItemDownloaded(guid: string): Promise<void> {
+  const items: RSSItem[] = store.get('rssItems') ?? [];
+  const idx = items.findIndex(i => i.guid === guid);
+  if (idx !== -1) {
+    items[idx].downloaded = true;
+    store.set('rssItems', items);
+  }
+}
+
+// === Search Providers ===
+
+export async function getSearchProviders(): Promise<SearchProvider[]> {
+  return store.get('searchProviders') ?? [];
+}
+
+export async function addSearchProvider(provider: Omit<SearchProvider, 'id'>): Promise<SearchProvider> {
+  const providers = store.get('searchProviders') ?? [];
+  const newProvider: SearchProvider = { ...provider, id: uuidv4() };
+  providers.push(newProvider);
+  store.set('searchProviders', providers);
+  return newProvider;
+}
+
+export async function updateSearchProvider(id: string, updates: Partial<SearchProvider>): Promise<SearchProvider> {
+  const providers = store.get('searchProviders') ?? [];
+  const idx = providers.findIndex((p: SearchProvider) => p.id === id);
+  if (idx === -1) throw new Error(`Search provider not found: ${id}`);
+  providers[idx] = { ...providers[idx], ...updates };
+  store.set('searchProviders', providers);
+  return providers[idx];
+}
+
+export async function removeSearchProvider(id: string): Promise<void> {
+  const providers = (store.get('searchProviders') ?? []).filter((p: SearchProvider) => p.id !== id);
+  store.set('searchProviders', providers);
+}
+
+// === IP Blocklists ===
+
+export async function getIPBlocklists(): Promise<IPBlocklist[]> {
+  return store.get('ipBlocklists') ?? [];
+}
+
+export async function addIPBlocklist(name: string, url: string): Promise<IPBlocklist> {
+  const lists = store.get('ipBlocklists') ?? [];
+  const newList: IPBlocklist = { id: uuidv4(), name, url, enabled: true };
+  lists.push(newList);
+  store.set('ipBlocklists', lists);
+  return newList;
+}
+
+export async function removeIPBlocklist(id: string): Promise<void> {
+  const lists = (store.get('ipBlocklists') ?? []).filter((l: IPBlocklist) => l.id !== id);
+  store.set('ipBlocklists', lists);
+  const data = store.get('blocklistData') ?? {};
+  delete data[id];
+  store.set('blocklistData', data);
+}
+
+export async function updateIPBlocklist(id: string, updates: Partial<IPBlocklist>): Promise<void> {
+  const lists = store.get('ipBlocklists') ?? [];
+  const idx = lists.findIndex((l: IPBlocklist) => l.id === id);
+  if (idx !== -1) {
+    lists[idx] = { ...lists[idx], ...updates };
+    store.set('ipBlocklists', lists);
+  }
+}
+
+export async function saveBlocklistData(id: string, data: string): Promise<void> {
+  const blocklistData = store.get('blocklistData') ?? {};
+  blocklistData[id] = data;
+  store.set('blocklistData', blocklistData);
+}
+
+export async function getBlocklistData(id: string): Promise<string | null> {
+  const blocklistData = store.get('blocklistData') ?? {};
+  return blocklistData[id] ?? null;
 }
 
 // Export store for testing/debugging
 export { store };
+

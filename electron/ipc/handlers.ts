@@ -2,15 +2,20 @@ import { ipcMain, dialog, BrowserWindow, shell, app, Notification } from 'electr
 import { getTorrentManager, TorrentError, createTorrentFile, getDefaultTrackers } from '../torrent';
 import { getCollaborativeSeedingManager } from '../seeding';
 import * as db from '../db/store';
-import { AddDownloadRequest, DownloadStats, CreateTorrentRequest } from '../../shared/types';
+import { AddDownloadRequest, DownloadStats, CreateTorrentRequest, FilePriority } from '../../shared/types';
 import { InvalidStateTransitionError } from '../../shared/state-machine';
 import catalog from '../data/catalog.json';
 import fs from 'fs/promises';
 import fsSync from 'fs';
 import path from 'path';
 import { logger, detectVPN, showVPNWarning } from '../utils';
+import { getRSSService } from '../services/rss-service';
+import { getSearchService } from '../services/search-service';
+import { getIPBlocklistService } from '../services/ip-blocklist';
+import { getWatchFolderService } from '../torrent/watch-folder';
 
 const log = logger.child('IPC');
+
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type IpcHandler = (event: Electron.IpcMainInvokeEvent, ...args: any[]) => Promise<any>;
@@ -497,8 +502,15 @@ export function setupIpcHandlers(mainWindow: BrowserWindow): void {
   // Auto-launch
   ipcMain.handle('app:setAutoLaunch', wrapHandler('app:setAutoLaunch',
     async (_event, enabled: boolean) => {
-      app.setLoginItemSettings({ openAtLogin: enabled });
+      // In packaged app the registry key is set automatically by electron-builder.
+      // openAsHidden: start minimised to tray when auto-launched at login.
+      app.setLoginItemSettings({
+        openAtLogin: enabled,
+        openAsHidden: enabled,
+      });
+
       await db.updateSettings({ autoLaunch: enabled } as any);
+      log.info('Auto-launch setting changed', { enabled });
       return { success: true };
     }
   ));
@@ -513,6 +525,7 @@ export function setupIpcHandlers(mainWindow: BrowserWindow): void {
   // Default client
   ipcMain.handle('app:isDefaultClient', wrapHandler('app:isDefaultClient',
     async () => {
+      // Check both magnet: and .torrent association
       return app.isDefaultProtocolClient('magnet');
     }
   ));
@@ -520,7 +533,26 @@ export function setupIpcHandlers(mainWindow: BrowserWindow): void {
   ipcMain.handle('app:setDefaultClient', wrapHandler('app:setDefaultClient',
     async () => {
       const success = app.setAsDefaultProtocolClient('magnet');
+      log.info('Set as default torrent client', { success });
       return { success };
+    }
+  ));
+
+  // Close-to-tray live update (no restart needed)
+  ipcMain.handle('app:setCloseToTray', wrapHandler('app:setCloseToTray',
+    async (_event, enabled: boolean) => {
+      await db.updateSettings({ closeToTray: enabled } as any);
+      log.info('Close-to-tray setting changed', { enabled });
+      return { success: true };
+    }
+  ));
+
+  // Minimize-to-tray live update (no restart needed)
+  ipcMain.handle('app:setMinimizeToTray', wrapHandler('app:setMinimizeToTray',
+    async (_event, enabled: boolean) => {
+      await db.updateSettings({ minimizeToTray: enabled } as any);
+      log.info('Minimize-to-tray setting changed', { enabled });
+      return { success: true };
     }
   ));
 
@@ -597,6 +629,213 @@ export function setupIpcHandlers(mainWindow: BrowserWindow): void {
   ipcMain.handle('stats:getAppStats', wrapHandler('stats:getAppStats',
     async () => {
       return db.getAppStatistics();
+    }
+  ));
+
+  // ============================================================
+  // Priority 1: New Torrent Engine Features
+  // ============================================================
+
+  ipcMain.handle('downloads:setSequential', wrapHandler('downloads:setSequential',
+    async (_event, id: string, enabled: boolean) => {
+      await torrentManager.setSequentialDownload(id, enabled);
+    }
+  ));
+
+  ipcMain.handle('downloads:setFilePriority', wrapHandler('downloads:setFilePriority',
+    async (_event, id: string, fileIndex: number, priority: FilePriority) => {
+      await torrentManager.setFilePriority(id, fileIndex, priority);
+    }
+  ));
+
+  ipcMain.handle('downloads:setSpeedLimits', wrapHandler('downloads:setSpeedLimits',
+    async (_event, id: string, downKbps: number, upKbps: number) => {
+      await torrentManager.setTorrentSpeedLimits(id, downKbps, upKbps);
+    }
+  ));
+
+  ipcMain.handle('downloads:setSeedRatio', wrapHandler('downloads:setSeedRatio',
+    async (_event, id: string, ratio: number) => {
+      await torrentManager.setSeedRatioLimit(id, ratio);
+    }
+  ));
+
+  ipcMain.handle('downloads:setSeedTime', wrapHandler('downloads:setSeedTime',
+    async (_event, id: string, minutes: number) => {
+      await torrentManager.setSeedTimeLimit(id, minutes);
+    }
+  ));
+
+  // Tracker management
+  ipcMain.handle('downloads:getTrackers', wrapHandler('downloads:getTrackers',
+    async (_event, id: string) => {
+      return torrentManager.getTrackers(id);
+    }
+  ));
+
+  ipcMain.handle('downloads:addTracker', wrapHandler('downloads:addTracker',
+    async (_event, id: string, url: string) => {
+      torrentManager.addTracker(id, url);
+    }
+  ));
+
+  ipcMain.handle('downloads:removeTracker', wrapHandler('downloads:removeTracker',
+    async (_event, id: string, url: string) => {
+      torrentManager.removeTracker(id, url);
+    }
+  ));
+
+  // Watch folder
+  ipcMain.handle('watchFolder:getStatus', wrapHandler('watchFolder:getStatus',
+    async () => {
+      const wf = getWatchFolderService();
+      return { active: wf.isActive, path: wf.currentPath };
+    }
+  ));
+
+  ipcMain.handle('watchFolder:set', wrapHandler('watchFolder:set',
+    async (_event, folderPath: string, enabled: boolean, deleteAfterAdd: boolean) => {
+      const wf = getWatchFolderService();
+      if (enabled && folderPath) {
+        wf.start(folderPath, deleteAfterAdd);
+      } else {
+        wf.stop();
+      }
+      // Persist to settings
+      await db.updateSettings({
+        watchFolderEnabled: enabled,
+        watchFolderPath: folderPath,
+        watchFolderDeleteAfterAdd: deleteAfterAdd,
+      });
+    }
+  ));
+
+  // ============================================================
+  // Priority 2: RSS
+  // ============================================================
+
+  ipcMain.handle('rss:getFeeds', wrapHandler('rss:getFeeds',
+    async () => db.getRSSFeeds()
+  ));
+
+  ipcMain.handle('rss:addFeed', wrapHandler('rss:addFeed',
+    async (_event, feed) => {
+      const rss = getRSSService();
+      return rss.addFeed(feed);
+    }
+  ));
+
+  ipcMain.handle('rss:updateFeed', wrapHandler('rss:updateFeed',
+    async (_event, id: string, updates) => {
+      const rss = getRSSService();
+      return rss.updateFeed(id, updates);
+    }
+  ));
+
+  ipcMain.handle('rss:removeFeed', wrapHandler('rss:removeFeed',
+    async (_event, id: string) => {
+      const rss = getRSSService();
+      await rss.removeFeed(id);
+    }
+  ));
+
+  ipcMain.handle('rss:checkFeed', wrapHandler('rss:checkFeed',
+    async (_event, id: string) => {
+      const rss = getRSSService();
+      return rss.checkFeed(id);
+    }
+  ));
+
+  ipcMain.handle('rss:checkAll', wrapHandler('rss:checkAll',
+    async () => {
+      const rss = getRSSService();
+      await rss.checkAllFeeds();
+    }
+  ));
+
+  ipcMain.handle('rss:getItems', wrapHandler('rss:getItems',
+    async (_event, feedId: string) => db.getRSSItems(feedId)
+  ));
+
+  ipcMain.handle('rss:markDownloaded', wrapHandler('rss:markDownloaded',
+    async (_event, guid: string) => db.markRSSItemDownloaded(guid)
+  ));
+
+  // ============================================================
+  // Priority 2: Search
+  // ============================================================
+
+  ipcMain.handle('search:query', wrapHandler('search:query',
+    async (_event, query: string, category?: string) => {
+      const searchSvc = getSearchService();
+      return searchSvc.search(query, category);
+    }
+  ));
+
+  ipcMain.handle('search:getProviders', wrapHandler('search:getProviders',
+    async () => db.getSearchProviders()
+  ));
+
+  ipcMain.handle('search:addProvider', wrapHandler('search:addProvider',
+    async (_event, provider) => db.addSearchProvider(provider)
+  ));
+
+  ipcMain.handle('search:updateProvider', wrapHandler('search:updateProvider',
+    async (_event, id: string, updates) => db.updateSearchProvider(id, updates)
+  ));
+
+  ipcMain.handle('search:removeProvider', wrapHandler('search:removeProvider',
+    async (_event, id: string) => db.removeSearchProvider(id)
+  ));
+
+  ipcMain.handle('search:testProvider', wrapHandler('search:testProvider',
+    async (_event, id: string) => {
+      const searchSvc = getSearchService();
+      return searchSvc.testProvider(id);
+    }
+  ));
+
+  // ============================================================
+  // Priority 2: IP Blocklist
+  // ============================================================
+
+  ipcMain.handle('blocklist:getAll', wrapHandler('blocklist:getAll',
+    async () => db.getIPBlocklists()
+  ));
+
+  ipcMain.handle('blocklist:add', wrapHandler('blocklist:add',
+    async (_event, name: string, url: string) => {
+      const bl = await db.addIPBlocklist(name, url);
+      // Immediately download
+      const blSvc = getIPBlocklistService();
+      try {
+        const count = await blSvc.updateBlocklist(bl.id);
+        return { ...bl, entryCount: count };
+      } catch (err) {
+        log.warn('Failed to download blocklist on add', { error: err });
+        return bl;
+      }
+    }
+  ));
+
+  ipcMain.handle('blocklist:remove', wrapHandler('blocklist:remove',
+    async (_event, id: string) => db.removeIPBlocklist(id)
+  ));
+
+  ipcMain.handle('blocklist:update', wrapHandler('blocklist:update',
+    async (_event, id: string) => {
+      const blSvc = getIPBlocklistService();
+      const count = await blSvc.updateBlocklist(id);
+      return { entryCount: count };
+    }
+  ));
+
+  ipcMain.handle('blocklist:setEnabled', wrapHandler('blocklist:setEnabled',
+    async (_event, id: string, enabled: boolean) => {
+      await db.updateIPBlocklist(id, { enabled });
+      // Reload blocklist data
+      const blSvc = getIPBlocklistService();
+      await blSvc.loadAll();
     }
   ));
 
