@@ -8,6 +8,8 @@ import catalog from '../data/catalog.json';
 import fs from 'fs/promises';
 import fsSync from 'fs';
 import path from 'path';
+import { execFile } from 'child_process';
+import { promisify } from 'util';
 import { logger, detectVPN, showVPNWarning } from '../utils';
 import { getRSSService } from '../services/rss-service';
 import { getSearchService } from '../services/search-service';
@@ -532,7 +534,44 @@ export function setupIpcHandlers(mainWindow: BrowserWindow): void {
 
   ipcMain.handle('app:setDefaultClient', wrapHandler('app:setDefaultClient',
     async () => {
+      // Register magnet: protocol via Electron API
       const success = app.setAsDefaultProtocolClient('magnet');
+
+      // Also register .torrent file association with custom icon via reg.exe
+      if (process.platform === 'win32') {
+        try {
+          const exePath = app.getPath('exe');
+          const exeDir = path.dirname(exePath);
+          const iconPath = path.join(exeDir, 'icon2.ico');
+          const execFileAsync = promisify(execFile);
+
+          // Register the file type class
+          const regCmds: [string, string[]][] = [
+            ['reg', ['add', 'HKCU\\Software\\Classes\\.torrent', '/ve', '/d', 'TorrentHunt.file', '/f']],
+            ['reg', ['add', 'HKCU\\Software\\Classes\\.torrent', '/v', 'Content Type', '/d', 'application/x-bittorrent', '/f']],
+            ['reg', ['add', 'HKCU\\Software\\Classes\\TorrentHunt.file', '/ve', '/d', 'BitTorrent Document', '/f']],
+            ['reg', ['add', 'HKCU\\Software\\Classes\\TorrentHunt.file\\DefaultIcon', '/ve', '/d', `${iconPath},0`, '/f']],
+            ['reg', ['add', 'HKCU\\Software\\Classes\\TorrentHunt.file\\shell\\open\\command', '/ve', '/d', `"${exePath}" "%1"`, '/f']],
+          ];
+
+          for (const [cmd, args] of regCmds) {
+            try { await execFileAsync(cmd, args); } catch (e) { /* non-fatal */ }
+          }
+
+          // Notify Windows shell to refresh icon cache
+          try {
+            await execFileAsync('powershell', [
+              '-NoProfile', '-Command',
+              `Add-Type -TypeDefinition 'using System.Runtime.InteropServices; public class Shell { [DllImport("shell32.dll")] public static extern void SHChangeNotify(int wEventId, int uFlags, IntPtr dwItem1, IntPtr dwItem2); }'; [Shell]::SHChangeNotify(0x08000000, 0, [IntPtr]::Zero, [IntPtr]::Zero)`
+            ]);
+          } catch (_) { /* non-fatal */ }
+
+          log.info('Registered .torrent file association with icon2.ico');
+        } catch (err) {
+          log.warn('Failed to register file association via reg.exe', { err });
+        }
+      }
+
       log.info('Set as default torrent client', { success });
       return { success };
     }

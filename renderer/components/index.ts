@@ -43,3 +43,4 @@ export { SettingsSidebar } from './SettingsSidebar';
 export type { SettingsCategory } from './SettingsSidebar';
 export { SeedingDashboard } from './SeedingDashboard';
 export { PrivacySettings } from './PrivacySettings';
+export { TorrentControlModal } from './TorrentControlModal';

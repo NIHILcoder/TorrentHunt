@@ -103,6 +103,12 @@
       "icon": "build/icon.ico",
       "requestedExecutionLevel": "asInvoker"
     },
+    "extraFiles": [
+      {
+        "from": "build/icon2.ico",
+        "to": "icon2.ico"
+      }
+    ],
     "nsis": {
       "oneClick": false,
       "perMachine": false,

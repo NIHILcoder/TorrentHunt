@@ -18,7 +18,8 @@ import {
   FilePreview,
   ContextMenu,
   ContextMenuItem,
-  TorrentFileSelector
+  TorrentFileSelector,
+  TorrentControlModal,
 } from '../components';
 import { useTranslation } from '../utils/i18nContext';
 import './DownloadsPage.css';
@@ -554,6 +555,10 @@ const DownloadsPage: React.FC<DownloadsPageProps> = ({
   const [showSortMenu, setShowSortMenu] = useState(false);
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
   const [showExportMenu, setShowExportMenu] = useState(false);
+
+  // Torrent control modal
+  const [controlModalId, setControlModalId] = useState<string | null>(null);
+  const controlModalDownload = controlModalId ? downloads.find(d => d.id === controlModalId) : null;
 
   // Refs
   const searchInputRef = useRef<HTMLInputElement>(null);
@@ -1532,6 +1537,19 @@ const DownloadsPage: React.FC<DownloadsPageProps> = ({
           y={contextMenu.y}
           items={[
             {
+              label: 'Advanced Controls...',
+              icon: 'settings',
+              onClick: () => {
+                setControlModalId(contextMenu.downloadId);
+                setContextMenu(null);
+              }
+            },
+            {
+              label: '',
+              onClick: () => {},
+              divider: true,
+            },
+            {
               label: 'Pause',
               icon: 'pause',
               onClick: () => {
@@ -1559,6 +1577,11 @@ const DownloadsPage: React.FC<DownloadsPageProps> = ({
               }
             },
             {
+              label: '',
+              onClick: () => {},
+              divider: true,
+            },
+            {
               label: 'Remove',
               icon: 'trash',
               danger: true,
@@ -1571,6 +1594,15 @@ const DownloadsPage: React.FC<DownloadsPageProps> = ({
             }
           ]}
           onClose={() => setContextMenu(null)}
+        />
+      )}
+
+      {/* Torrent Control Modal */}
+      {controlModalDownload && (
+        <TorrentControlModal
+          download={controlModalDownload}
+          onClose={() => setControlModalId(null)}
+          onUpdate={loadDownloads}
         />
       )}
     </div>
