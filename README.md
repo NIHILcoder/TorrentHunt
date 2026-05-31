@@ -1,60 +1,140 @@
 # TorrentHunt
 
-![TorrentHunt](https://img.shields.io/badge/Platform-Windows%20%7C%20macOS%20%7C%20Linux-blue)
+![Platform](https://img.shields.io/badge/Platform-Windows%20%7C%20macOS%20%7C%20Linux-blue)
+![Version](https://img.shields.io/badge/Version-1.4.0--beta-orange)
 ![License](https://img.shields.io/badge/License-MIT-green)
+![Built with](https://img.shields.io/badge/Electron%20%2B%20React%20%2B%20WebTorrent-informational)
 
-## About
+A modern, privacy-focused desktop BitTorrent client built with Electron, React and
+WebTorrent. TorrentHunt ships ready to use — search the Internet Archive and browse a
+curated catalog out of the box — while keeping everything else opt-in and under your
+control.
 
-TorrentHunt is a desktop application for downloading and distributing open-source software using the BitTorrent protocol. The application is designed exclusively for legal use with open-source projects that officially distribute their releases via torrents.
+> **Legal use only.** TorrentHunt does not bundle indexers for copyrighted material.
+> Built-in sources point at public-domain / Creative Commons / open-source content
+> (Internet Archive, FOSS Torrents). Any additional search providers or RSS feeds are
+> added by you, and you are responsible for what you download and share.
 
-## Purpose
-
-The primary goal of TorrentHunt is to provide a secure, user-friendly, and efficient tool for:
-
-- **Accessing open-source software**: Download Linux distributions, development tools, and other open-source projects available through official torrent channels
-- **Supporting the open-source ecosystem**: Contribute bandwidth by seeding downloaded content to help other users
-- **Decentralized distribution**: Reduce the load on project servers by utilizing peer-to-peer technology
-- **Curated catalog**: Browse a collection of verified open-source software with direct download links
-
-## Target Audience
-
-- Software developers requiring development environments and tools
-- System administrators deploying open-source infrastructure
-- Educational institutions distributing free software
-- Open-source enthusiasts supporting community projects
-
-## Key Features
 ---
-## Technical Stack
 
-- **Frontend**: React, TypeScript
-- **Backend**: Electron, Node.js
-- **Torrent Engine**: WebTorrent
-- **Architecture**: Multi-process with secure IPC communication
+## Features
 
-## System Requirements
+### Downloads
+- Add torrents via **.torrent file, magnet link, or drag & drop** — local files *and*
+  remote `.torrent` URLs are supported
+- Pause / resume / remove (with optional file deletion), retry failed downloads
+- **Per-file selection & priority**, sequential download, per-torrent speed limits
+- **Seed ratio / seed time limits**, tracker add/remove per torrent
+- Categories, search/filter/sort, list & detailed views
+- Open the OS "open with" dialog when you double-click a `.torrent` — no silent adds
 
-- Operating System: Windows 10+, macOS 10.14+, or Linux
-- Runtime: Node.js 18.x or higher
-- RAM: Minimum ~? GB recommended
-- Storage: Variable, depends on downloaded content
+### Discover content
+- **Built-in Internet Archive search** — keyless, on-demand, public-domain & CC torrents
+  (web-seeded, so they download even with no peers)
+- **Pluggable search providers** — bring your own **Jackett**, **Prowlarr (Torznab)**, or
+  a custom JSON API; test connectivity from the UI
+- **Community catalog** of verified open-source software
+- **RSS feeds** with auto-download, regex title filters and per-feed intervals; a few
+  legal FOSS feeds are pre-seeded **disabled** (opt-in, no background traffic until you
+  enable them) — plus one-click list cleanup
 
-## Legal Notice
+### Create & share
+- Create torrents from files or folders (single or batch), custom trackers, private flag,
+  start-seeding-immediately
+- **Collaborative seeding** with a reputation/badge system
 
-TorrentHunt is intended for downloading and distributing content that is legally available through torrents. Users are responsible for ensuring they have the right to download and share all content accessed through this application. The application includes a curated catalog of verified open-source software projects that officially support torrent distribution.
+### Automation & networking
+- **Scheduler** for time-based bandwidth/activity rules
+- **Watch folder** — auto-add `.torrent` files dropped into a directory
+- **IP blocklist** support
+- **VPN detection** with a startup warning when no VPN is active
+- Proxy configuration
 
-## Data Persistence
+### Desktop experience
+- **Background mode** — closing the window minimizes to the **system tray** so torrents
+  keep running; uses your `icon.ico`
+- Run at login, close/minimize-to-tray, native completion notifications
+- **Themes** (dark / light / system) with a clean monochrome design
+- **Customizable hotkeys**
+- **Localization** — English & Russian
+- Settings export / import
 
-All download information, including progress, metadata, and application settings, is stored in a local PostgreSQL database. This ensures:
-- Downloads resume automatically after unexpected shutdowns
-- Historical tracking of completed downloads
-- Persistent application configuration
-- Data integrity and reliability
+### Privacy & security
+- Context isolation, sandboxed renderer, Node integration disabled, type-safe IPC bridge
+- Content-Security-Policy and navigation guards in production builds
+- Privacy options: clear data on exit, ephemeral peer ID, log sanitization
 
-## Architecture Overview
+---
 
-### State Management
-Downloads are governed by a strict state machine with the following lifecycle:
+## Tech Stack
+
+| Layer        | Technology                                   |
+|--------------|----------------------------------------------|
+| UI           | React 18, TypeScript, Framer Motion, Recharts |
+| State        | Zustand                                      |
+| Desktop      | Electron 28, Node.js                          |
+| Torrents     | WebTorrent                                    |
+| Persistence  | electron-store (local JSON)                   |
+| Build        | webpack (renderer), tsc (main), electron-builder |
+
+---
+
+## Getting Started
+
+### Prerequisites
+- **Node.js 18+** and npm
+- Windows 10+, macOS 10.14+, or a modern Linux distribution
+
+### Install
+```bash
+npm install
+```
+
+### Run in development
+Starts the webpack dev server and Electron with hot reload:
+```bash
+npm run dev
+```
+
+### Build
+```bash
+npm run build        # compile main + renderer
+npm run typecheck    # type-check both projects
+npm run lint         # lint
+```
+
+### Package a desktop installer
+```bash
+npm run dist         # builds and packages (Windows NSIS by default)
+```
+Packaged output is written to `release/`.
+
+---
+
+## Project Structure
+
+```
+electron/            Main process (TypeScript)
+  torrent/           WebTorrent manager, creator, watch folder
+  services/          RSS, search, IP blocklist
+  seeding/           Collaborative seeding & reputation
+  scheduler/         Time-based scheduler engine
+  db/                electron-store wrapper
+  ipc/               Typed IPC handlers
+  utils/             Logger, VPN detection, secure store, helpers
+  main.ts            App lifecycle, tray, window, security
+  preload.ts         contextBridge IPC API
+renderer/            React UI (pages, components, stores, i18n)
+shared/              Types and the download state machine
+build/               App icons & installer resources
+```
+
+---
+
+## Architecture
+
+### Download state machine
+Downloads follow a validated lifecycle (`shared/state-machine.ts`):
 
 ```
 QUEUED → DOWNLOADING → COMPLETED → SEEDING
@@ -63,37 +143,48 @@ QUEUED → DOWNLOADING → COMPLETED → SEEDING
              ↓
           ERROR → REMOVED
 ```
+Invalid transitions are rejected to keep state consistent.
 
-All state transitions are validated to prevent invalid operations and ensure data consistency.
+### Persistence
+Downloads, settings, feeds, providers and reputation are stored locally via
+**electron-store** (JSON). Progress is written on a debounced interval (batched into a
+single write) to keep disk I/O low while torrents are active, so downloads resume after a
+restart.
+
+### Process & security model
+- Renderer runs context-isolated and sandboxed; Node integration is disabled
+- A minimal, type-safe preload bridge exposes only the IPC surface the UI needs
+- Production builds apply a Content-Security-Policy and block in-app navigation to
+  external origins (external links open in the default browser)
 
 ### Logging
-Application events are logged to the `logs/` directory with:
-- Daily log rotation (format: `torrenthunt-YYYY-MM-DD.log`)
-- Automatic cleanup of logs older than 7 days
-- Multiple severity levels (debug, info, warn, error)
-- Structured format for analysis and debugging
+Structured logs are written to the app's `logs/` directory with daily rotation,
+multiple severity levels, and automatic cleanup of old files.
 
-### Security Model
-- **Context Isolation**: Renderer process runs in isolated context
-- **Node Integration Disabled**: Prevents direct access to Node.js APIs from renderer
-- **Preload Script**: Provides minimal, type-safe IPC bridge
-- **Content Security Policy**: Restricts resource loading and script execution
+---
 
 ## Known Limitations
 
-### Bandwidth Throttling
-The WebTorrent library does not support native bandwidth throttling. While the application stores speed limit settings, they are not actively enforced. Users requiring strict bandwidth control should use OS-level network management tools.
+- **Speed limits** are applied best-effort via WebTorrent's throttling API and may vary by
+  version. For strict control, use OS-level network management.
+- **Peer statistics**: WebTorrent reports aggregate peers and does not cleanly separate
+  seeds from leechers, so those numbers are approximate. For Internet Archive results the
+  "seeds" column reflects download count (a popularity proxy), since the Archive does not
+  expose swarm stats.
 
-### Peer Statistics
-WebTorrent provides aggregate peer counts but does not distinguish between seeds (users with complete files) and leechers (users still downloading). The "seeds" metric may not reflect actual values.
+---
 
-### Catalog Content
-The included catalog contains placeholder entries for demonstration purposes. Users should replace these with valid magnet links from official open-source project websites.
+## Contributing
+
+CI runs on every push / PR (`.github/workflows/ci.yml`): type-check and build are required
+gates; lint runs as advisory. Please run `npm run typecheck` and `npm run build` before
+opening a PR.
+
+---
 
 ## License
 
-MIT License - see LICENSE file for details.
+MIT License — see the `LICENSE` file.
 
-Copyright © 2025 TorrentHunt
-
-Permission is granted for free use, modification, and distribution of this software for any purpose, including commercial applications, subject to the terms of the MIT License.
+Copyright © 2026 TorrentHunt. Free to use, modify and distribute under the terms of the
+MIT License.
