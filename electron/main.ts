@@ -377,6 +377,22 @@ async function initializeApp(): Promise<void> {
 
   logger.info('App', 'TorrentHunt starting...');
 
+  // Safety net: log async errors from native deps (e.g. utp-native socket
+  // errors, networking hiccups) instead of letting Electron pop an endless
+  // "A JavaScript error occurred in the main process" dialog. Genuine startup
+  // bugs still surface in logs.
+  process.on('uncaughtException', (err) => {
+    logger.error('App', 'Uncaught exception (suppressed)', {
+      message: err?.message,
+      stack: err?.stack,
+    });
+  });
+  process.on('unhandledRejection', (reason) => {
+    logger.error('App', 'Unhandled rejection (suppressed)', {
+      reason: reason instanceof Error ? reason.message : String(reason),
+    });
+  });
+
   // Apply CSP before any window loads content
   applyContentSecurityPolicy();
 

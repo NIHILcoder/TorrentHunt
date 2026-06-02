@@ -160,7 +160,7 @@ export async function createTorrentFile(
 
   return new Promise((resolve, reject) => {
     // Create a temporary WebTorrent client for seeding
-    const client = new WebTorrent();
+    const client = new WebTorrent({ utp: false } as any);
 
     // Simulate progress updates during hashing
     let lastProgress = 0;

@@ -84,7 +84,14 @@ export class TorrentManager {
     // Use an ephemeral, non-identifying BitTorrent peer ID. It carries the
     // TorrentHunt client prefix (-TH<version>-) followed by random bytes that
     // rotate every launch, so peers can't correlate sessions long-term.
-    this.client = new WebTorrent({ peerId: this.generateEphemeralPeerId() } as any);
+    //
+    // utp: false — disable µTP transport. The native utp-native module throws
+    // uncaught "no buffer space available" (WSAENOBUFS) errors on Windows under
+    // load, which crash the main process. Plain TCP is stable and universal.
+    this.client = new WebTorrent({
+      peerId: this.generateEphemeralPeerId(),
+      utp: false,
+    } as any);
 
     this.client.on('error', (err: string | Error) => {
       log.error('WebTorrent client error', { error: err });
@@ -98,7 +105,7 @@ export class TorrentManager {
    * 20 bytes total, no machine-identifying data.
    */
   private generateEphemeralPeerId(): Buffer {
-    const prefix = '-TH0140-'; // TH client, v1.5.5
+    const prefix = '-TH1550-'; // TH client, v1.5.5 (Azureus-style)
     const random = require('crypto').randomBytes(20 - prefix.length).toString('hex').slice(0, 20 - prefix.length);
     return Buffer.from(prefix + random);
   }
@@ -309,7 +316,7 @@ export class TorrentManager {
     log.info('Getting torrent info', params);
 
     return new Promise((resolve, reject) => {
-      const tempClient = new WebTorrent();
+      const tempClient = new WebTorrent({ utp: false } as any);
       let resolved = false;
 
       const timeout = setTimeout(() => {
