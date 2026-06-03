@@ -10,9 +10,11 @@ import { Toggle } from './Toggle';
 import { Button } from './Button';
 import { Alert } from './Alert';
 import { PrivacyConfig, VPNDetectionResult } from '../../shared/types';
+import { useTranslation } from '../utils/i18nContext';
 import './PrivacySettings.css';
 
 export const PrivacySettings: React.FC = () => {
+  const { t } = useTranslation();
   const [config, setConfig] = useState<PrivacyConfig>({
     anonymousMode: true,
     encryptStorage: true,
@@ -73,36 +75,24 @@ export const PrivacySettings: React.FC = () => {
   };
 
   const handleClearAllData = async () => {
-    const confirmed = confirm(
-      '⚠️ This will permanently delete all your data including:\n\n' +
-      '• All downloads and torrents\n' +
-      '• Reputation and transactions\n' +
-      '• Categories and settings\n' +
-      '• All logs and temporary files\n\n' +
-      'This action CANNOT be undone!\n\n' +
-      'Are you absolutely sure?'
-    );
+    const confirmed = confirm(t('privacy.confirm1'));
 
     if (!confirmed) return;
 
     // Second confirmation
-    const doubleConfirmed = confirm(
-      '⚠️ FINAL WARNING!\n\n' +
-      'You are about to delete ALL DATA.\n' +
-      'Type YES in your mind and click OK to proceed.'
-    );
+    const doubleConfirmed = confirm(t('privacy.confirm2'));
 
     if (!doubleConfirmed) return;
 
     try {
       await window.api.clearAllData();
-      alert('✅ All data cleared successfully!\n\nThe application will reload.');
+      alert(t('privacy.cleared'));
 
       // Reload the page to reflect changes
       window.location.reload();
     } catch (error) {
       console.error('Failed to clear data:', error);
-      alert('❌ Failed to clear data. Check console for details.');
+      alert(t('privacy.clearFailed'));
     }
   };
 
@@ -110,25 +100,25 @@ export const PrivacySettings: React.FC = () => {
     <div className="privacy-settings">
       {/* Header */}
       <div className="settings-category-header">
-        <h1 className="settings-category-title">🔒 Privacy & Anonymity</h1>
+        <h1 className="settings-category-title">🔒 {t('privacy.title')}</h1>
         <p className="settings-category-subtitle">
-          Configure advanced privacy features to protect your anonymity
+          {t('privacy.subtitle')}
         </p>
       </div>
 
       {/* VPN Status */}
       {vpnStatus === 'connected' && vpnDetails && (
         <Alert variant="success">
-          <strong>✅ VPN Detected!</strong>
+          <strong>✅ {t('privacy.vpn.detected')}</strong>
           <p>
             {vpnDetails.details.vpnProvider
-              ? `Connected via ${vpnDetails.details.vpnProvider}`
-              : 'VPN connection detected'}
-            {' '}(Confidence: {vpnDetails.confidence})
+              ? `${t('privacy.vpn.connectedVia')} ${vpnDetails.details.vpnProvider}`
+              : t('privacy.vpn.connected')}
+            {' '}({t('privacy.vpn.confidence')}: {vpnDetails.confidence})
           </p>
           {vpnDetails.details.detectedInterfaces.length > 0 && (
             <p style={{ fontSize: '0.85em', opacity: 0.8 }}>
-              Interfaces: {vpnDetails.details.detectedInterfaces.join(', ')}
+              {t('privacy.vpn.interfaces')}: {vpnDetails.details.detectedInterfaces.join(', ')}
             </p>
           )}
         </Alert>
@@ -136,11 +126,11 @@ export const PrivacySettings: React.FC = () => {
 
       {vpnStatus === 'disconnected' && vpnDetails && (
         <Alert variant="warning">
-          <strong>⚠️ VPN Not Detected!</strong>
-          <p>Your real IP address may be visible to peers. Consider using a VPN for better privacy.</p>
+          <strong>⚠️ {t('privacy.vpn.notDetected')}</strong>
+          <p>{t('privacy.vpn.notDetectedDesc')}</p>
           {vpnDetails.details.publicIP && (
             <p style={{ fontSize: '0.85em', opacity: 0.8 }}>
-              Your public IP: {vpnDetails.details.publicIP}
+              {t('privacy.vpn.yourIP')}: {vpnDetails.details.publicIP}
             </p>
           )}
           <Button
@@ -150,15 +140,15 @@ export const PrivacySettings: React.FC = () => {
             style={{ marginTop: '8px' }}
           >
             <Icon name="refresh-cw" size={14} />
-            {isCheckingVPN ? 'Checking...' : 'Re-check VPN'}
+            {isCheckingVPN ? t('privacy.vpn.checking') : t('privacy.vpn.recheck')}
           </Button>
         </Alert>
       )}
 
       {vpnStatus === 'unknown' && (
         <Alert variant="info">
-          <strong>ℹ️ VPN Status Unknown</strong>
-          <p>Unable to determine VPN status. Click to check manually.</p>
+          <strong>ℹ️ {t('privacy.vpn.unknown')}</strong>
+          <p>{t('privacy.vpn.unknownDesc')}</p>
           <Button
             variant="secondary"
             onClick={checkVPNStatus}
@@ -166,7 +156,7 @@ export const PrivacySettings: React.FC = () => {
             style={{ marginTop: '8px' }}
           >
             <Icon name="refresh-cw" size={14} />
-            {isCheckingVPN ? 'Checking...' : 'Check VPN Status'}
+            {isCheckingVPN ? t('privacy.vpn.checking') : t('privacy.vpn.check')}
           </Button>
         </Alert>
       )}
@@ -174,28 +164,27 @@ export const PrivacySettings: React.FC = () => {
       {/* Encryption Status */}
       {!encryptionAvailable && (
         <Alert variant="info">
-          <strong>ℹ️ Encryption Unavailable</strong>
-          <p>Your system doesn't support secure encryption. Data will be obfuscated but not fully encrypted.</p>
+          <strong>ℹ️ {t('privacy.enc.unavailable')}</strong>
+          <p>{t('privacy.enc.unavailableDesc')}</p>
         </Alert>
       )}
 
       {/* Anonymity */}
       <div className="settings-group">
-        <h3 className="settings-group-title">ANONYMITY</h3>
+        <h3 className="settings-group-title">{t('privacy.grp.anonymity')}</h3>
 
         <div className="setting-item">
           <div className="setting-info">
             <label className="setting-label">
               <Icon name="refresh-cw" size={16} />
-              Ephemeral Peer ID
+              {t('privacy.ephemeralId')}
             </label>
             <p className="setting-description">
-              The BitTorrent peer ID is randomized every launch (no machine-identifying
-              data), so peers can&apos;t correlate your sessions over time.
+              {t('privacy.ephemeralId.desc')}
             </p>
           </div>
           <div className="setting-control">
-            <span className="privacy-status on"><Icon name="check-circle" size={14} /> Always on</span>
+            <span className="privacy-status on"><Icon name="check-circle" size={14} /> {t('privacy.alwaysOn')}</span>
           </div>
         </div>
 
@@ -203,11 +192,10 @@ export const PrivacySettings: React.FC = () => {
           <div className="setting-info">
             <label className="setting-label">
               <Icon name="shield" size={16} />
-              VPN Detection
+              {t('privacy.vpnDetection')}
             </label>
             <p className="setting-description">
-              Show a warning on startup if no VPN is detected. A VPN is the only way
-              to actually hide your IP from peers.
+              {t('privacy.vpnDetection.desc')}
             </p>
           </div>
           <div className="setting-control">
@@ -222,11 +210,10 @@ export const PrivacySettings: React.FC = () => {
           <div className="setting-info">
             <label className="setting-label">
               <Icon name="shield" size={16} />
-              VPN Kill-Switch
+              {t('privacy.killSwitch')}
             </label>
             <p className="setting-description">
-              Continuously monitor the VPN and automatically pause all torrents if it
-              drops, so your real IP is never exposed. Resume is manual.
+              {t('privacy.killSwitch.desc')}
             </p>
           </div>
           <div className="setting-control">
@@ -240,24 +227,23 @@ export const PrivacySettings: React.FC = () => {
 
       {/* Data Protection */}
       <div className="settings-group">
-        <h3 className="settings-group-title">DATA PROTECTION</h3>
+        <h3 className="settings-group-title">{t('privacy.grp.dataProtection')}</h3>
 
         <div className="setting-item">
           <div className="setting-info">
             <label className="setting-label">
               <Icon name="lock" size={16} />
-              Encrypted Secrets
+              {t('privacy.encSecrets')}
             </label>
             <p className="setting-description">
-              Proxy password and search-provider API keys are encrypted at rest using
-              OS-level encryption (Keychain / DPAPI / libsecret).
+              {t('privacy.encSecrets.desc')}
             </p>
           </div>
           <div className="setting-control">
             {encryptionAvailable ? (
-              <span className="privacy-status on"><Icon name="check-circle" size={14} /> Active</span>
+              <span className="privacy-status on"><Icon name="check-circle" size={14} /> {t('privacy.active')}</span>
             ) : (
-              <span className="privacy-status off"><Icon name="alert-triangle" size={14} /> Unavailable</span>
+              <span className="privacy-status off"><Icon name="alert-triangle" size={14} /> {t('privacy.unavailable')}</span>
             )}
           </div>
         </div>
@@ -266,10 +252,10 @@ export const PrivacySettings: React.FC = () => {
           <div className="setting-info">
             <label className="setting-label">
               <Icon name="trash" size={16} />
-              Clear Data on Exit
+              {t('privacy.clearOnExit')}
             </label>
             <p className="setting-description">
-              Automatically delete logs and temporary data when closing the app.
+              {t('privacy.clearOnExit.desc')}
             </p>
           </div>
           <div className="setting-control">
@@ -283,16 +269,16 @@ export const PrivacySettings: React.FC = () => {
 
       {/* Logging */}
       <div className="settings-group">
-        <h3 className="settings-group-title">LOGGING</h3>
+        <h3 className="settings-group-title">{t('privacy.grp.logging')}</h3>
 
         <div className="setting-item">
           <div className="setting-info">
             <label className="setting-label">
               <Icon name="file-text" size={16} />
-              Sanitize Logs
+              {t('privacy.sanitizeLogs')}
             </label>
             <p className="setting-description">
-              Remove or hash sensitive data (IPs, IDs) in log files.
+              {t('privacy.sanitizeLogs.desc')}
             </p>
           </div>
           <div className="setting-control">
@@ -307,10 +293,10 @@ export const PrivacySettings: React.FC = () => {
           <div className="setting-info">
             <label className="setting-label">
               <Icon name="x-circle" size={16} />
-              Disable Logging
+              {t('privacy.disableLogs')}
             </label>
             <p className="setting-description">
-              Completely disable file logging. ⚠️ Makes debugging difficult.
+              {t('privacy.disableLogs.desc')}
             </p>
           </div>
           <div className="setting-control">
@@ -324,17 +310,16 @@ export const PrivacySettings: React.FC = () => {
 
       {/* Danger Zone */}
       <div className="settings-group danger-zone">
-        <h3 className="settings-group-title">⚠️ DANGER ZONE</h3>
+        <h3 className="settings-group-title">⚠️ {t('privacy.grp.danger')}</h3>
 
         <div className="setting-item">
           <div className="setting-info">
             <label className="setting-label">
               <Icon name="alert-triangle" size={16} />
-              Clear All Data
+              {t('privacy.clearAll')}
             </label>
             <p className="setting-description">
-              Permanently delete all data including reputation, downloads, and settings.
-              This action cannot be undone!
+              {t('privacy.clearAll.desc')}
             </p>
           </div>
           <div className="setting-control">
@@ -343,7 +328,7 @@ export const PrivacySettings: React.FC = () => {
               onClick={handleClearAllData}
             >
               <Icon name="trash" size={16} />
-              Clear All Data
+              {t('privacy.clearAll')}
             </Button>
           </div>
         </div>
@@ -351,19 +336,19 @@ export const PrivacySettings: React.FC = () => {
 
       {/* Privacy Tips */}
       <div className="privacy-tips">
-        <h3>💡 Privacy Tips</h3>
+        <h3>💡 {t('privacy.tips.title')}</h3>
         <ul>
-          <li><strong>Use VPN:</strong> Always use a trustworthy VPN to hide your real IP address</li>
-          <li><strong>Bind to VPN:</strong> Configure network binding to VPN interface to prevent IP leaks</li>
-          <li><strong>Disable WebRTC:</strong> If using magnet links in browser, disable WebRTC to prevent leaks</li>
-          <li><strong>Use Private Trackers:</strong> Enable "Private torrent" option when creating torrents</li>
-          <li><strong>Check Regularly:</strong> Use IPLeak.net to verify your IP is hidden</li>
+          <li><strong>{t('privacy.tips.vpn')}</strong> {t('privacy.tips.vpnText')}</li>
+          <li><strong>{t('privacy.tips.bind')}</strong> {t('privacy.tips.bindText')}</li>
+          <li><strong>{t('privacy.tips.webrtc')}</strong> {t('privacy.tips.webrtcText')}</li>
+          <li><strong>{t('privacy.tips.private')}</strong> {t('privacy.tips.privateText')}</li>
+          <li><strong>{t('privacy.tips.check')}</strong> {t('privacy.tips.checkText')}</li>
         </ul>
       </div>
 
       {/* Privacy Score */}
       <div className="privacy-score">
-        <h3>Privacy Score</h3>
+        <h3>{t('privacy.score')}</h3>
         <div className="score-bar">
           <div
             className="score-fill"
@@ -374,7 +359,7 @@ export const PrivacySettings: React.FC = () => {
           />
         </div>
         <div className="score-label">
-          {calculatePrivacyScore(config, vpnStatus)}/100 - {getScoreLabel(calculatePrivacyScore(config, vpnStatus))}
+          {calculatePrivacyScore(config, vpnStatus)}/100 - {t(getScoreLabelKey(calculatePrivacyScore(config, vpnStatus)))}
         </div>
       </div>
     </div>
@@ -402,9 +387,11 @@ function getScoreColor(score: number): string {
   return '#ef4444'; // Red
 }
 
-function getScoreLabel(score: number): string {
-  if (score >= 80) return 'Excellent';
-  if (score >= 60) return 'Good';
-  if (score >= 40) return 'Fair';
-  return 'Poor';
+type ScoreLabelKey = 'privacy.score.excellent' | 'privacy.score.good' | 'privacy.score.fair' | 'privacy.score.poor';
+
+function getScoreLabelKey(score: number): ScoreLabelKey {
+  if (score >= 80) return 'privacy.score.excellent';
+  if (score >= 60) return 'privacy.score.good';
+  if (score >= 40) return 'privacy.score.fair';
+  return 'privacy.score.poor';
 }

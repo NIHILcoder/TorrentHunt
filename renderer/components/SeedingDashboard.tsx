@@ -8,9 +8,11 @@
 import React, { useState, useEffect } from 'react';
 import { Icon, ProgressBar, Toggle } from '../components';
 import { UserReputation, SeedingPlan, ReputationTransaction, Badge } from '../../shared/types';
+import { useTranslation } from '../utils/i18nContext';
 import './SeedingDashboard.css';
 
 export const SeedingDashboard: React.FC = () => {
+  const { t } = useTranslation();
   const [reputation, setReputation] = useState<UserReputation | null>(null);
   const [recommendations, setRecommendations] = useState<SeedingPlan | null>(null);
   const [transactions, setTransactions] = useState<ReputationTransaction[]>([]);
@@ -82,17 +84,17 @@ export const SeedingDashboard: React.FC = () => {
   const formatTimeAgo = (timestamp: number): string => {
     const seconds = Math.floor((Date.now() - timestamp) / 1000);
 
-    if (seconds < 60) return 'just now';
-    if (seconds < 3600) return `${Math.floor(seconds / 60)}m ago`;
-    if (seconds < 86400) return `${Math.floor(seconds / 3600)}h ago`;
-    return `${Math.floor(seconds / 86400)}d ago`;
+    if (seconds < 60) return t('seeding.justNow');
+    if (seconds < 3600) return `${Math.floor(seconds / 60)} ${t('seeding.minAgo')}`;
+    if (seconds < 86400) return `${Math.floor(seconds / 3600)} ${t('seeding.hourAgo')}`;
+    return `${Math.floor(seconds / 86400)} ${t('seeding.dayAgo')}`;
   };
 
   if (loading) {
     return (
       <div className="seeding-dashboard loading">
         <Icon name="loader" size={32} className="spinner" />
-        <p>Loading data...</p>
+        <p>{t('seeding.loading')}</p>
       </div>
     );
   }
@@ -105,16 +107,16 @@ export const SeedingDashboard: React.FC = () => {
           <div className="dashboard-title-text">
             <h2 className="dashboard-title">
               <Icon name="share-2" size={20} />
-              Collaborative Seeding Network
-              <span className="dashboard-badge">Local Beta</span>
+              {t('seeding.network')}
+              <span className="dashboard-badge">{t('seeding.localBeta')}</span>
             </h2>
             <p className="dashboard-subtitle">
-              Earn points by seeding rare torrents and help the community
+              {t('seeding.networkSubtitle')}
             </p>
           </div>
           <div className="enable-toggle">
             <span className={`enable-status ${enabled ? 'on' : 'off'}`}>
-              {enabled ? 'Active' : 'Off'}
+              {enabled ? t('seeding.active') : t('seeding.off')}
             </span>
             <Toggle checked={enabled} onChange={handleToggleEnabled} />
           </div>
@@ -123,16 +125,14 @@ export const SeedingDashboard: React.FC = () => {
         {!enabled && (
           <div className="seeding-disabled-banner">
             <Icon name="info" size={16} />
-            <span>Enable the network to start earning points by seeding rare torrents. Your stats below are preserved while it&apos;s off.</span>
+            <span>{t('seeding.disabledBanner')}</span>
           </div>
         )}
 
         <div className="seeding-soon-banner">
           <Icon name="clock" size={16} />
           <span>
-            <strong>Network sync coming soon.</strong> Points, levels and recommendations
-            work locally today. Sharing reputation and seeder discovery across the P2P
-            network is in development.
+            <strong>{t('seeding.soonTitle')}</strong> {t('seeding.soonText')}
           </span>
         </div>
       </div>
@@ -140,39 +140,39 @@ export const SeedingDashboard: React.FC = () => {
       {/* Reputation Card */}
       <div className="reputation-card">
         <div className="reputation-header">
-          <h2>Your Reputation</h2>
+          <h2>{t('seeding.yourReputation')}</h2>
           <div className="level-badge">
             <span className="level-number">{reputation?.level || 1}</span>
-            <span className="level-label">level</span>
+            <span className="level-label">{t('seeding.level')}</span>
           </div>
         </div>
 
         <div className="reputation-stats">
           <div className="stat-item">
             <div className="stat-value">{reputation?.points.toFixed(0) || 0}</div>
-            <div className="stat-label">Points</div>
+            <div className="stat-label">{t('seeding.points')}</div>
           </div>
 
           <div className="stat-item">
             <div className="stat-value">{reputation?.ratio.toFixed(2) || '0.00'}</div>
-            <div className="stat-label">Ratio</div>
+            <div className="stat-label">{t('seeding.ratio')}</div>
           </div>
 
           <div className="stat-item">
             <div className="stat-value">{formatBytes(reputation?.uploadedTotal || 0)}</div>
-            <div className="stat-label">Uploaded</div>
+            <div className="stat-label">{t('seeding.uploaded')}</div>
           </div>
 
           <div className="stat-item">
             <div className="stat-value">{reputation?.rareTorrentsSeeded || 0}</div>
-            <div className="stat-label">Rare Torrents</div>
+            <div className="stat-label">{t('seeding.rareTorrents')}</div>
           </div>
         </div>
 
         {/* Level progress */}
         <div className="level-progress">
           <div className="progress-header">
-            <span>Progress to level {(reputation?.level || 1) + 1}</span>
+            <span>{t('seeding.progressTo')} {(reputation?.level || 1) + 1}</span>
             <span>{getLevelProgress().toFixed(0)}%</span>
           </div>
           <ProgressBar value={getLevelProgress()} />
@@ -180,7 +180,7 @@ export const SeedingDashboard: React.FC = () => {
 
         {/* Badges */}
         <div className="badges-section">
-          <h3>Achievements</h3>
+          <h3>{t('seeding.achievements')}</h3>
           <div className="badges-grid">
             {badges.map(badge => (
               <div
@@ -200,10 +200,10 @@ export const SeedingDashboard: React.FC = () => {
       <div className="recommendations-section">
         <h3 className="section-title">
           <Icon name="zap" size={16} />
-          Recommended for Seeding
+          {t('seeding.recommended')}
         </h3>
         <p className="section-subtitle">
-          These torrents will earn you the most points
+          {t('seeding.recommendedSubtitle')}
         </p>
 
         {recommendations && recommendations.torrents.length > 0 ? (
@@ -214,7 +214,7 @@ export const SeedingDashboard: React.FC = () => {
                   <div className="rec-name">{rec.torrentName}</div>
                   <div className="rec-bounty">
                     <Icon name="star" size={16} />
-                    <span>+{rec.expectedBounty.toFixed(0)} points</span>
+                    <span>+{rec.expectedBounty.toFixed(0)} {t('seeding.pointsSuffix')}</span>
                   </div>
                 </div>
 
@@ -222,11 +222,11 @@ export const SeedingDashboard: React.FC = () => {
 
                 <div className="rec-stats">
                   <div className="rec-stat">
-                    <span className="stat-label">Rarity:</span>
+                    <span className="stat-label">{t('seeding.rarity')}</span>
                     <span className="stat-value">{rec.priority.rarity.toFixed(0)}/100</span>
                   </div>
                   <div className="rec-stat">
-                    <span className="stat-label">Demand:</span>
+                    <span className="stat-label">{t('seeding.demand')}</span>
                     <span className="stat-value">{rec.priority.demand.toFixed(0)}/100</span>
                   </div>
                 </div>
@@ -236,7 +236,7 @@ export const SeedingDashboard: React.FC = () => {
         ) : (
           <div className="empty-recommendations">
             <Icon name="inbox" size={48} />
-            <p>Complete torrent downloads to get recommendations</p>
+            <p>{t('seeding.emptyRecs')}</p>
           </div>
         )}
       </div>
@@ -245,7 +245,7 @@ export const SeedingDashboard: React.FC = () => {
       <div className="transactions-section">
         <h3 className="section-title">
           <Icon name="activity" size={16} />
-          Recent Transactions
+          {t('seeding.recentTx')}
         </h3>
 
         {transactions.length > 0 ? (
@@ -260,9 +260,9 @@ export const SeedingDashboard: React.FC = () => {
                   <div className="tx-time">{formatTimeAgo(tx.timestamp)}</div>
                 </div>
                 <div className="tx-type">
-                  {tx.type === 'earn' && <span className="tx-badge tx-badge-earn">Earned</span>}
-                  {tx.type === 'bonus' && <span className="tx-badge tx-badge-bonus">Bonus</span>}
-                  {tx.type === 'spend' && <span className="tx-badge tx-badge-spend">Spent</span>}
+                  {tx.type === 'earn' && <span className="tx-badge tx-badge-earn">{t('seeding.txEarn')}</span>}
+                  {tx.type === 'bonus' && <span className="tx-badge tx-badge-bonus">{t('seeding.txBonus')}</span>}
+                  {tx.type === 'spend' && <span className="tx-badge tx-badge-spend">{t('seeding.txSpend')}</span>}
                 </div>
               </div>
             ))}
@@ -270,7 +270,7 @@ export const SeedingDashboard: React.FC = () => {
         ) : (
           <div className="empty-transactions">
             <Icon name="activity" size={48} />
-            <p>Transaction history is empty</p>
+            <p>{t('seeding.emptyTx')}</p>
           </div>
         )}
       </div>

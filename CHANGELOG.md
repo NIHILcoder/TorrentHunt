@@ -4,6 +4,19 @@ All notable changes to TorrentHunt are documented here.
 This project follows [Keep a Changelog](https://keepachangelog.com/) and
 [Semantic Versioning](https://semver.org/).
 
+## [1.5.8-beta] - 2026-06-03
+
+### Added
+- **Full Russian localization of Settings** — every settings tab and its
+  sub-panels (General, Downloads, Network, Advanced, Scheduler, Seeding,
+  Privacy, Interface, Notifications, System, About) plus the Privacy panel,
+  Seeding dashboard and statistics are now fully translated (en/ru).
+
+### Changed
+- **Settings toggles auto-save** — switches now persist instantly on click and
+  apply their side-effects immediately; the "Save Changes" bar is reserved for
+  text/number fields only. "Cancel" reverts every tracked field.
+
 ## [1.5.7-beta] - 2026-06-03
 
 ### Added
@@ -30,5 +43,6 @@ This project follows [Keep a Changelog](https://keepachangelog.com/) and
 - Real encryption / anonymity options, VPN kill-switch, disk-space guard,
   and torrent health indicators.
 
+[1.5.8-beta]: https://github.com/NIHILcoder/TorrentHunt/releases/tag/v1.5.8-beta
 [1.5.7-beta]: https://github.com/NIHILcoder/TorrentHunt/releases/tag/v1.5.7-beta
 [1.5.6-beta]: https://github.com/NIHILcoder/TorrentHunt/releases/tag/v1.5.6-beta

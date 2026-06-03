@@ -1,5 +1,6 @@
 import React from 'react';
 import { Icon } from './Icon';
+import { useTranslation } from '../utils/i18nContext';
 import './AppStatistics.css';
 
 interface AppStatisticsProps {
@@ -19,6 +20,7 @@ export const AppStatistics: React.FC<AppStatisticsProps> = ({
   diskUsage,
   uptime,
 }) => {
+  const { t } = useTranslation();
   return (
     <div className="app-statistics">
       <div className="stats-grid">
@@ -27,7 +29,7 @@ export const AppStatistics: React.FC<AppStatisticsProps> = ({
             <Icon name="download" size={20} />
           </div>
           <div className="stat-info">
-            <div className="stat-label">Total Downloads</div>
+            <div className="stat-label">{t('stats.totalDownloads')}</div>
             <div className="stat-value">{totalDownloads}</div>
           </div>
         </div>
@@ -37,7 +39,7 @@ export const AppStatistics: React.FC<AppStatisticsProps> = ({
             <Icon name="arrow-down" size={20} />
           </div>
           <div className="stat-info">
-            <div className="stat-label">Downloaded</div>
+            <div className="stat-label">{t('stats.downloaded')}</div>
             <div className="stat-value">{totalDownloaded}</div>
           </div>
         </div>
@@ -47,7 +49,7 @@ export const AppStatistics: React.FC<AppStatisticsProps> = ({
             <Icon name="arrow-up" size={20} />
           </div>
           <div className="stat-info">
-            <div className="stat-label">Uploaded</div>
+            <div className="stat-label">{t('stats.uploaded')}</div>
             <div className="stat-value">{totalUploaded}</div>
           </div>
         </div>
@@ -57,7 +59,7 @@ export const AppStatistics: React.FC<AppStatisticsProps> = ({
             <Icon name="database" size={20} />
           </div>
           <div className="stat-info">
-            <div className="stat-label">Cache</div>
+            <div className="stat-label">{t('stats.cache')}</div>
             <div className="stat-value">{cacheSize}</div>
           </div>
         </div>
@@ -67,7 +69,7 @@ export const AppStatistics: React.FC<AppStatisticsProps> = ({
             <Icon name="hard-drive" size={20} />
           </div>
           <div className="stat-info">
-            <div className="stat-label">Disk Usage</div>
+            <div className="stat-label">{t('stats.diskUsage')}</div>
             <div className="stat-value">{diskUsage}</div>
           </div>
         </div>
@@ -77,7 +79,7 @@ export const AppStatistics: React.FC<AppStatisticsProps> = ({
             <Icon name="clock" size={20} />
           </div>
           <div className="stat-info">
-            <div className="stat-label">Uptime</div>
+            <div className="stat-label">{t('stats.uptime')}</div>
             <div className="stat-value">{uptime}</div>
           </div>
         </div>

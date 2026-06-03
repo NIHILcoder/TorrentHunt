@@ -122,7 +122,7 @@ const SettingsPage: React.FC = () => {
     { id: 'seeding', label: t('settings.seeding'), icon: 'share-2', group: 'advanced' },
 
     // Privacy & Security
-    { id: 'privacy', label: 'Privacy', icon: 'shield', group: 'security' },
+    { id: 'privacy', label: t('settings.privacy'), icon: 'shield', group: 'security' },
 
     // Appearance
     { id: 'interface', label: t('settings.interface'), icon: 'sun', group: 'appearance' },
@@ -135,7 +135,9 @@ const SettingsPage: React.FC = () => {
     { id: 'about', label: t('settings.about'), icon: 'info', group: 'other' },
   ];
 
-  const dayNames = ['Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa', 'Su'];
+  const dayNames = language === 'ru'
+    ? ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс']
+    : ['Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa', 'Su'];
 
   useEffect(() => {
     loadSettings();
@@ -162,26 +164,26 @@ const SettingsPage: React.FC = () => {
     const off = window.api.onUpdateStatus((status) => {
       switch (status.kind) {
         case 'checking':
-          setMessage({ type: 'success', text: 'Checking for updates...' });
+          setMessage({ type: 'success', text: t('settings.msg.checking') });
           break;
         case 'available':
-          setMessage({ type: 'success', text: `Update ${status.version ?? ''} available — downloading...` });
+          setMessage({ type: 'success', text: t('settings.msg.updateAvailable') });
           break;
         case 'not-available':
-          setMessage({ type: 'success', text: 'You are on the latest version.' });
+          setMessage({ type: 'success', text: t('settings.msg.latest') });
           break;
         case 'downloading':
-          setMessage({ type: 'success', text: `Downloading update... ${status.percent ?? 0}%` });
+          setMessage({ type: 'success', text: `${t('settings.msg.downloading')} ${status.percent ?? 0}%` });
           break;
         case 'downloaded':
           setUpdateReady(String(status.version ?? ''));
-          setMessage({ type: 'success', text: 'Update downloaded — ready to install.' });
+          setMessage({ type: 'success', text: t('settings.msg.downloaded') });
           break;
         case 'error':
-          setMessage({ type: 'error', text: `Update error: ${status.message ?? 'unknown'}` });
+          setMessage({ type: 'error', text: `${t('settings.msg.updateError')} ${status.message ?? 'unknown'}` });
           break;
         case 'dev-disabled':
-          setMessage({ type: 'error', text: 'Updates only work in the installed app.' });
+          setMessage({ type: 'error', text: t('settings.msg.devOnly') });
           break;
       }
     });
@@ -193,53 +195,36 @@ const SettingsPage: React.FC = () => {
   useEffect(() => {
     if (!settings) return;
     const s = settings as AppSettings;
+    // Only text/number/select inputs drive the Save bar — toggles auto-save on click.
     const changed =
       defaultDownloadDir !== s.defaultDownloadDir ||
       maxDownKbps !== s.maxDownKbps ||
       maxUpKbps !== s.maxUpKbps ||
       maxActiveDownloads !== s.maxActiveDownloads ||
-      minimizeToTray !== s.minimizeToTray ||
-      closeToTray !== s.closeToTray ||
-      autoLaunch !== s.autoLaunch ||
       // Advanced
-      enableDHT !== s.enableDHT ||
-      enablePEX !== s.enablePEX ||
-      enableLSD !== s.enableLSD ||
       maxConnections !== s.maxConnections ||
       portMin !== s.portMin ||
       portMax !== s.portMax ||
       // Proxy
-      proxyEnabled !== s.proxyEnabled ||
       proxyType !== s.proxyType ||
       proxyHost !== s.proxyHost ||
       proxyPort !== s.proxyPort ||
       proxyUsername !== s.proxyUsername ||
       proxyPassword !== s.proxyPassword ||
       // Watch folder
-      watchFolderEnabled !== s.watchFolderEnabled ||
       watchFolderPath !== s.watchFolderPath ||
-      watchFolderDeleteAfterAdd !== s.watchFolderDeleteAfterAdd ||
       // Disk guard
-      diskGuardEnabled !== (s.diskGuardEnabled ?? true) ||
       diskGuardMinFreeMB !== (s.diskGuardMinFreeMB ?? 2048) ||
       // Seeding
       defaultSeedRatioLimit !== s.defaultSeedRatioLimit ||
-      defaultSeedTimeLimitMinutes !== s.defaultSeedTimeLimitMinutes ||
-      // Notifications
-      enableNotifications !== (s.enableNotifications ?? true) ||
-      enableSounds !== (s.enableSounds ?? true) ||
-      notifyOnComplete !== (s.notifyOnComplete ?? true) ||
-      notifyOnError !== (s.notifyOnError ?? true);
+      defaultSeedTimeLimitMinutes !== s.defaultSeedTimeLimitMinutes;
     setHasChanges(changed);
   }, [
     settings, defaultDownloadDir, maxDownKbps, maxUpKbps, maxActiveDownloads,
-    minimizeToTray, closeToTray, autoLaunch,
-    enableDHT, enablePEX, enableLSD, maxConnections, portMin, portMax,
-    proxyEnabled, proxyType, proxyHost, proxyPort, proxyUsername, proxyPassword,
-    watchFolderEnabled, watchFolderPath, watchFolderDeleteAfterAdd,
-    diskGuardEnabled, diskGuardMinFreeMB,
+    maxConnections, portMin, portMax,
+    proxyType, proxyHost, proxyPort, proxyUsername, proxyPassword,
+    watchFolderPath, diskGuardMinFreeMB,
     defaultSeedRatioLimit, defaultSeedTimeLimitMinutes,
-    enableNotifications, enableSounds, notifyOnComplete, notifyOnError,
   ]);
 
   const applyTheme = (selectedTheme: Theme) => {
@@ -312,7 +297,7 @@ const SettingsPage: React.FC = () => {
       setSchedules(scheduler.schedules);
     } catch (error) {
       console.error('Failed to load settings:', error);
-      setMessage({ type: 'error', text: 'Failed to load settings' });
+      setMessage({ type: 'error', text: t('settings.msg.loadFailed') });
     } finally {
       setLoading(false);
     }
@@ -339,10 +324,10 @@ const SettingsPage: React.FC = () => {
       const newEnabled = !schedulerEnabled;
       await window.api.updateScheduler({ enabled: newEnabled });
       setSchedulerEnabled(newEnabled);
-      setMessage({ type: 'success', text: newEnabled ? 'Scheduler enabled' : 'Scheduler disabled' });
+      setMessage({ type: 'success', text: newEnabled ? t('settings.msg.schedOn') : t('settings.msg.schedOff') });
     } catch (error) {
       console.error('Failed to toggle scheduler:', error);
-      setMessage({ type: 'error', text: 'Failed to toggle scheduler' });
+      setMessage({ type: 'error', text: t('settings.msg.schedFailed') });
     }
   };
 
@@ -372,6 +357,35 @@ const SettingsPage: React.FC = () => {
       }
     } catch (error) {
       console.error('Failed to select directory:', error);
+    }
+  };
+
+  // Auto-save a single toggle the moment it's clicked. Text/number fields still
+  // go through the Save bar, but switches persist instantly (and run any
+  // side-effect, e.g. registering auto-launch with the OS). The settings
+  // baseline is updated optimistically so the Save bar doesn't appear for them.
+  const applyToggle = async (
+    value: boolean,
+    setter: (v: boolean) => void,
+    patch: Partial<AppSettings>,
+    sideEffect?: (v: boolean) => unknown,
+  ) => {
+    setter(value);
+    setSettings(prev => (prev ? { ...prev, ...patch } : prev));
+    try {
+      await window.api.updateSettings(patch);
+      if (sideEffect) await sideEffect(value);
+    } catch (err) {
+      console.error('Auto-save toggle failed:', err);
+      setMessage({ type: 'error', text: t('settings.msg.autosaveFailed') });
+      await loadSettings();
+    }
+  };
+
+  // Watch-folder toggles need the live path + both flags pushed to the watcher.
+  const applyWatchFolder = (enabled: boolean, deleteAfter: boolean) => {
+    if (window.api.setWatchFolder) {
+      return window.api.setWatchFolder(watchFolderPath, enabled, deleteAfter);
     }
   };
 
@@ -443,12 +457,12 @@ const SettingsPage: React.FC = () => {
         });
       }
 
-      setMessage({ type: 'success', text: 'Settings saved successfully!' });
+      setMessage({ type: 'success', text: t('settings.msg.saved') });
       setHasChanges(false);
       await loadSettings();
     } catch (error) {
       console.error('Failed to save settings:', error);
-      setMessage({ type: 'error', text: 'Failed to save settings' });
+      setMessage({ type: 'error', text: t('settings.msg.saveFailed') });
     } finally {
       setSaving(false);
     }
@@ -456,10 +470,23 @@ const SettingsPage: React.FC = () => {
 
   const handleReset = () => {
     if (settings) {
+      // Revert every input field the Save bar tracks back to the saved values.
       setDefaultDownloadDir(settings.defaultDownloadDir);
       setMaxDownKbps(settings.maxDownKbps);
       setMaxUpKbps(settings.maxUpKbps);
       setMaxActiveDownloads(settings.maxActiveDownloads);
+      setMaxConnections(settings.maxConnections ?? 100);
+      setPortMin(settings.portMin ?? 6881);
+      setPortMax(settings.portMax ?? 6889);
+      setProxyType(settings.proxyType ?? 'http');
+      setProxyHost(settings.proxyHost ?? '');
+      setProxyPort(settings.proxyPort ?? 8080);
+      setProxyUsername(settings.proxyUsername ?? '');
+      setProxyPassword(settings.proxyPassword ?? '');
+      setWatchFolderPath(settings.watchFolderPath ?? '');
+      setDiskGuardMinFreeMB(settings.diskGuardMinFreeMB ?? 2048);
+      setDefaultSeedRatioLimit(settings.defaultSeedRatioLimit ?? 0);
+      setDefaultSeedTimeLimitMinutes(settings.defaultSeedTimeLimitMinutes ?? 0);
       setHasChanges(false);
     }
     if (schedulerConfig) {
@@ -472,10 +499,10 @@ const SettingsPage: React.FC = () => {
     setClearingCache(true);
     try {
       await window.api.clearCache();
-      setMessage({ type: 'success', text: 'Cache cleared successfully!' });
+      setMessage({ type: 'success', text: t('settings.msg.cacheCleared') });
     } catch (error) {
       console.error('Failed to clear cache:', error);
-      setMessage({ type: 'error', text: 'Failed to clear cache' });
+      setMessage({ type: 'error', text: t('settings.msg.cacheFailed') });
     } finally {
       setClearingCache(false);
     }
@@ -486,13 +513,13 @@ const SettingsPage: React.FC = () => {
       const result = await window.api.setDefaultClient();
       if (result.success) {
         setIsDefaultClient(true);
-        setMessage({ type: 'success', text: 'Set as default torrent client!' });
+        setMessage({ type: 'success', text: t('settings.msg.defaultSet') });
       } else {
-        setMessage({ type: 'error', text: 'Failed to set as default client' });
+        setMessage({ type: 'error', text: t('settings.msg.defaultFailed') });
       }
     } catch (error) {
       console.error('Failed to set default client:', error);
-      setMessage({ type: 'error', text: 'Failed to set as default client' });
+      setMessage({ type: 'error', text: t('settings.msg.defaultFailed') });
     }
   };
 
@@ -500,11 +527,11 @@ const SettingsPage: React.FC = () => {
     try {
       const result = await window.api.exportSettings();
       if (result.success) {
-        setMessage({ type: 'success', text: 'Settings exported!' });
+        setMessage({ type: 'success', text: t('settings.msg.exported') });
       }
     } catch (error) {
       console.error('Failed to export settings:', error);
-      setMessage({ type: 'error', text: 'Failed to export settings' });
+      setMessage({ type: 'error', text: t('settings.msg.exportFailed') });
     }
   };
 
@@ -513,25 +540,25 @@ const SettingsPage: React.FC = () => {
       const result = await window.api.importSettings();
       if (result.success) {
         await loadSettings();
-        setMessage({ type: 'success', text: 'Settings imported!' });
+        setMessage({ type: 'success', text: t('settings.msg.imported') });
       }
     } catch (error) {
       console.error('Failed to import settings:', error);
-      setMessage({ type: 'error', text: 'Failed to import settings' });
+      setMessage({ type: 'error', text: t('settings.msg.importFailed') });
     }
   };
 
   const handleCheckForUpdates = async () => {
-    setMessage({ type: 'success', text: 'Checking for updates...' });
+    setMessage({ type: 'success', text: t('settings.msg.checking') });
     try {
       const res = await window.api.checkForUpdates();
       if (!res.ok && res.reason === 'dev') {
-        setMessage({ type: 'error', text: 'Updates are only available in the installed app, not in dev mode.' });
+        setMessage({ type: 'error', text: t('settings.msg.devOnly2') });
       }
       // Other outcomes (available / not-available / downloading / downloaded /
       // error) arrive via the onUpdateStatus subscription below.
     } catch {
-      setMessage({ type: 'error', text: 'Failed to check for updates.' });
+      setMessage({ type: 'error', text: t('settings.msg.checkFailed') });
     }
   };
 
@@ -539,7 +566,7 @@ const SettingsPage: React.FC = () => {
     return (
       <div className="settings-page settings-loading">
         <Icon name="loader" size={32} />
-        <p>Loading settings...</p>
+        <p>{t('settings.loading')}</p>
       </div>
     );
   }
@@ -591,10 +618,10 @@ const SettingsPage: React.FC = () => {
         {hasChanges && (
           <div className="settings-actions">
             <Button variant="secondary" onClick={handleReset}>
-              Cancel
+              {t('settings.cancel')}
             </Button>
             <Button onClick={handleSave} loading={saving} disabled={saving}>
-              Save Changes
+              {t('settings.saveChanges')}
             </Button>
           </div>
         )}
@@ -635,37 +662,37 @@ const SettingsPage: React.FC = () => {
     return (
       <>
         <div className="settings-category-header">
-          <h1 className="settings-category-title">General</h1>
-          <p className="settings-category-subtitle">Basic application configuration</p>
+          <h1 className="settings-category-title">{t('settings.general')}</h1>
+          <p className="settings-category-subtitle">{t('settings.sub.general')}</p>
         </div>
 
         <div className="settings-group">
-          <h3 className="settings-group-title">APPLICATION</h3>
+          <h3 className="settings-group-title">{t('settings.grp.application')}</h3>
           {renderSettingItem(
-            'Auto Launch',
-            'Start TorrentHunt when system boots',
-            renderToggle(autoLaunch, () => setAutoLaunch(!autoLaunch))
+            t('settings.autoLaunch'),
+            t('settings.autoLaunch.desc'),
+            renderToggle(autoLaunch, () => applyToggle(!autoLaunch, setAutoLaunch, { autoLaunch: !autoLaunch }, (v) => window.api.setAutoLaunch(v)))
           )}
           {renderSettingItem(
-            'Auto Update',
-            'Automatically download and install updates',
-            renderToggle(autoUpdate, () => setAutoUpdate(!autoUpdate))
+            t('settings.autoUpdate'),
+            t('settings.autoUpdate.desc'),
+            renderToggle(autoUpdate, () => applyToggle(!autoUpdate, setAutoUpdate, { autoUpdate: !autoUpdate }))
           )}
         </div>
 
         <div className="settings-divider" />
 
         <div className="settings-group">
-          <h3 className="settings-group-title">BEHAVIOR</h3>
+          <h3 className="settings-group-title">{t('settings.grp.behavior')}</h3>
           {renderSettingItem(
-            'Minimize to Tray',
-            'Keep app running in system tray when minimized',
-            renderToggle(minimizeToTray, () => setMinimizeToTray(!minimizeToTray))
+            t('settings.minTray'),
+            t('settings.minTray.desc'),
+            renderToggle(minimizeToTray, () => applyToggle(!minimizeToTray, setMinimizeToTray, { minimizeToTray: !minimizeToTray }, (v) => window.api.setMinimizeToTray(v)))
           )}
           {renderSettingItem(
-            'Close to Tray',
-            'Hide window instead of quitting when closing',
-            renderToggle(closeToTray, () => setCloseToTray(!closeToTray))
+            t('settings.closeTray'),
+            t('settings.closeTray.desc'),
+            renderToggle(closeToTray, () => applyToggle(!closeToTray, setCloseToTray, { closeToTray: !closeToTray }, (v) => window.api.setCloseToTray(v)))
           )}
         </div>
       </>
@@ -676,17 +703,17 @@ const SettingsPage: React.FC = () => {
     return (
       <>
         <div className="settings-category-header">
-          <h1 className="settings-category-title">Downloads</h1>
-          <p className="settings-category-subtitle">Manage download location, limits and watch folder</p>
+          <h1 className="settings-category-title">{t('settings.downloads')}</h1>
+          <p className="settings-category-subtitle">{t('settings.sub.downloads')}</p>
         </div>
 
         <div className="settings-group">
-          <h3 className="settings-group-title">LOCATION</h3>
+          <h3 className="settings-group-title">{t('settings.grp.location')}</h3>
           {renderSettingItem(
-            'Default Directory',
-            'Where to save downloaded files',
+            t('settings.defaultDir'),
+            t('settings.defaultDir.desc'),
             <Button variant="secondary" icon={<Icon name="folder-open" size={16} />} onClick={handleSelectDirectory}>
-              Choose
+              {t('settings.choose')}
             </Button>
           )}
           {defaultDownloadDir && <div className="setting-value-display">{defaultDownloadDir}</div>}
@@ -695,10 +722,10 @@ const SettingsPage: React.FC = () => {
         <div className="settings-divider" />
 
         <div className="settings-group">
-          <h3 className="settings-group-title">LIMITS</h3>
+          <h3 className="settings-group-title">{t('settings.grp.limits')}</h3>
           {renderSettingItem(
-            'Maximum Active Downloads',
-            'How many torrents can download simultaneously',
+            t('settings.maxActive'),
+            t('settings.maxActive.desc'),
             <input
               type="number"
               className="input-compact"
@@ -714,13 +741,13 @@ const SettingsPage: React.FC = () => {
 
         {/* Watch Folder */}
         <div className="settings-group">
-          <h3 className="settings-group-title">WATCH FOLDER</h3>
+          <h3 className="settings-group-title">{t('settings.grp.watchFolder')}</h3>
           {renderSettingItem(
-            'Enable Watch Folder',
-            'Automatically add .torrent files dropped into a folder',
+            t('settings.watchEnable'),
+            t('settings.watchEnable.desc'),
             <button
               className={`toggle-switch ${watchFolderEnabled ? 'active' : ''}`}
-              onClick={() => setWatchFolderEnabled(!watchFolderEnabled)}
+              onClick={() => applyToggle(!watchFolderEnabled, setWatchFolderEnabled, { watchFolderEnabled: !watchFolderEnabled }, (v) => applyWatchFolder(v, watchFolderDeleteAfterAdd))}
             >
               <span className="toggle-slider" />
             </button>
@@ -729,13 +756,13 @@ const SettingsPage: React.FC = () => {
           {watchFolderEnabled && (
             <>
               {renderSettingItem(
-                'Watch Folder Path',
-                'Folder to monitor for .torrent files',
+                t('settings.watchPath'),
+                t('settings.watchPath.desc'),
                 <div className="path-input-row">
                   <input
                     type="text"
                     className="input-compact input-path"
-                    placeholder="e.g. C:\Downloads\Watch"
+                    placeholder={t('settings.watchPath.placeholder')}
                     value={watchFolderPath}
                     onChange={e => setWatchFolderPath(e.target.value)}
                   />
@@ -751,11 +778,11 @@ const SettingsPage: React.FC = () => {
                 </div>
               )}
               {renderSettingItem(
-                'Delete .torrent After Adding',
-                'Remove the .torrent file after it has been added to the queue',
+                t('settings.watchDelete'),
+                t('settings.watchDelete.desc'),
                 <button
                   className={`toggle-switch ${watchFolderDeleteAfterAdd ? 'active' : ''}`}
-                  onClick={() => setWatchFolderDeleteAfterAdd(!watchFolderDeleteAfterAdd)}
+                  onClick={() => applyToggle(!watchFolderDeleteAfterAdd, setWatchFolderDeleteAfterAdd, { watchFolderDeleteAfterAdd: !watchFolderDeleteAfterAdd }, (v) => applyWatchFolder(watchFolderEnabled, v))}
                 >
                   <span className="toggle-slider" />
                 </button>
@@ -768,20 +795,20 @@ const SettingsPage: React.FC = () => {
 
         {/* Disk-space guard */}
         <div className="settings-group">
-          <h3 className="settings-group-title">DISK-SPACE GUARD</h3>
+          <h3 className="settings-group-title">{t('settings.grp.diskGuard')}</h3>
           {renderSettingItem(
-            'Auto-pause on low disk space',
-            'Continuously watch free space on the download drive and pause all torrents before the disk fills up. Resume is manual.',
+            t('settings.diskGuard'),
+            t('settings.diskGuard.desc'),
             <button
               className={`toggle-switch ${diskGuardEnabled ? 'active' : ''}`}
-              onClick={() => setDiskGuardEnabled(!diskGuardEnabled)}
+              onClick={() => applyToggle(!diskGuardEnabled, setDiskGuardEnabled, { diskGuardEnabled: !diskGuardEnabled })}
             >
               <span className="toggle-slider" />
             </button>
           )}
           {diskGuardEnabled && renderSettingItem(
-            'Minimum free space',
-            'Pause everything when free space drops below this value.',
+            t('settings.diskMin'),
+            t('settings.diskMin.desc'),
             <div className="speed-input-compact">
               <input
                 type="number"
@@ -803,15 +830,15 @@ const SettingsPage: React.FC = () => {
     return (
       <>
         <div className="settings-category-header">
-          <h1 className="settings-category-title">Network</h1>
-          <p className="settings-category-subtitle">Download and upload speed, connections, ports</p>
+          <h1 className="settings-category-title">{t('settings.network')}</h1>
+          <p className="settings-category-subtitle">{t('settings.sub.network')}</p>
         </div>
 
         <div className="settings-group">
-          <h3 className="settings-group-title">SPEED LIMITS</h3>
+          <h3 className="settings-group-title">{t('settings.grp.speedLimits')}</h3>
           {renderSettingItem(
-            'Download Speed',
-            'Set maximum download speed (0 = unlimited)',
+            t('settings.downSpeed'),
+            t('settings.downSpeed.desc'),
             <div className="speed-input-compact">
               <input
                 type="number"
@@ -824,8 +851,8 @@ const SettingsPage: React.FC = () => {
             </div>
           )}
           {renderSettingItem(
-            'Upload Speed',
-            'Set maximum upload speed (0 = unlimited)',
+            t('settings.upSpeed'),
+            t('settings.upSpeed.desc'),
             <div className="speed-input-compact">
               <input
                 type="number"
@@ -841,23 +868,23 @@ const SettingsPage: React.FC = () => {
 
         <div className="settings-notice-compact">
           <Icon name="info" size={14} />
-          <span>Speed limiting is best-effort due to WebTorrent limitations</span>
+          <span>{t('settings.speedNote')}</span>
         </div>
 
         <div className="settings-divider" />
 
         <div className="settings-group">
-          <h3 className="settings-group-title">PROXY</h3>
+          <h3 className="settings-group-title">{t('settings.grp.proxy')}</h3>
           {renderSettingItem(
-            'Enable Proxy',
-            'Route tracker requests through a proxy server',
-            renderToggle(proxyEnabled, () => setProxyEnabled(!proxyEnabled))
+            t('settings.proxyEnable'),
+            t('settings.proxyEnable.desc'),
+            renderToggle(proxyEnabled, () => applyToggle(!proxyEnabled, setProxyEnabled, { proxyEnabled: !proxyEnabled }))
           )}
           {proxyEnabled && (
             <>
               {renderSettingItem(
-                'Proxy Type',
-                'Protocol for the proxy connection',
+                t('settings.proxyType'),
+                t('settings.proxyType.desc'),
                 <select
                   className="input-compact"
                   value={proxyType}
@@ -869,8 +896,8 @@ const SettingsPage: React.FC = () => {
                 </select>
               )}
               {renderSettingItem(
-                'Proxy Host',
-                'Proxy server hostname or IP',
+                t('settings.proxyHost'),
+                t('settings.proxyHost.desc'),
                 <input
                   type="text"
                   className="input-compact"
@@ -880,8 +907,8 @@ const SettingsPage: React.FC = () => {
                 />
               )}
               {renderSettingItem(
-                'Proxy Port',
-                'Proxy server port',
+                t('settings.proxyPort'),
+                t('settings.proxyPort.desc'),
                 <input
                   type="number"
                   className="input-compact input-mono"
@@ -892,8 +919,8 @@ const SettingsPage: React.FC = () => {
                 />
               )}
               {renderSettingItem(
-                'Username',
-                'Proxy authentication username (optional)',
+                t('settings.proxyUser'),
+                t('settings.proxyUser.desc'),
                 <input
                   type="text"
                   className="input-compact"
@@ -903,8 +930,8 @@ const SettingsPage: React.FC = () => {
                 />
               )}
               {renderSettingItem(
-                'Password',
-                'Proxy authentication password (optional)',
+                t('settings.proxyPass'),
+                t('settings.proxyPass.desc'),
                 <input
                   type="password"
                   className="input-compact"
@@ -915,7 +942,7 @@ const SettingsPage: React.FC = () => {
               )}
               <div className="settings-notice-compact">
                 <Icon name="info" size={14} />
-                <span>Proxy applies to tracker requests only. Direct peer-to-peer UDP connections bypass the proxy.</span>
+                <span>{t('settings.proxyNote')}</span>
               </div>
             </>
           )}
@@ -928,36 +955,36 @@ const SettingsPage: React.FC = () => {
     return (
       <>
         <div className="settings-category-header">
-          <h1 className="settings-category-title">Advanced</h1>
-          <p className="settings-category-subtitle">Protocols, connections, and technical settings</p>
+          <h1 className="settings-category-title">{t('settings.advanced')}</h1>
+          <p className="settings-category-subtitle">{t('settings.sub.advanced')}</p>
         </div>
 
         <div className="settings-group">
-          <h3 className="settings-group-title">PROTOCOLS</h3>
+          <h3 className="settings-group-title">{t('settings.grp.protocols')}</h3>
           {renderSettingItem(
-            'Enable DHT',
-            'Distributed Hash Table for peer discovery',
-            renderToggle(enableDHT, () => setEnableDHT(!enableDHT))
+            t('settings.dht'),
+            t('settings.dht.desc'),
+            renderToggle(enableDHT, () => applyToggle(!enableDHT, setEnableDHT, { enableDHT: !enableDHT }))
           )}
           {renderSettingItem(
-            'Enable PEX',
-            'Peer Exchange for peer discovery',
-            renderToggle(enablePEX, () => setEnablePEX(!enablePEX))
+            t('settings.pex'),
+            t('settings.pex.desc'),
+            renderToggle(enablePEX, () => applyToggle(!enablePEX, setEnablePEX, { enablePEX: !enablePEX }))
           )}
           {renderSettingItem(
-            'Enable LSD',
-            'Local Service Discovery',
-            renderToggle(enableLSD, () => setEnableLSD(!enableLSD))
+            t('settings.lsd'),
+            t('settings.lsd.desc'),
+            renderToggle(enableLSD, () => applyToggle(!enableLSD, setEnableLSD, { enableLSD: !enableLSD }))
           )}
         </div>
 
         <div className="settings-divider" />
 
         <div className="settings-group">
-          <h3 className="settings-group-title">CONNECTIONS</h3>
+          <h3 className="settings-group-title">{t('settings.grp.connections')}</h3>
           {renderSettingItem(
-            'Maximum Connections',
-            'Per torrent connection limit',
+            t('settings.maxConn'),
+            t('settings.maxConn.desc'),
             <input
               type="number"
               className="input-compact input-mono"
@@ -972,11 +999,11 @@ const SettingsPage: React.FC = () => {
         <div className="settings-divider" />
 
         <div className="settings-group">
-          <h3 className="settings-group-title">PORT CONFIGURATION</h3>
+          <h3 className="settings-group-title">{t('settings.grp.ports')}</h3>
           <div className="setting-item">
             <div className="setting-info">
-              <div className="setting-label">Listening Port Range</div>
-              <p className="setting-description">Port range for incoming connections</p>
+              <div className="setting-label">{t('settings.portRange')}</div>
+              <p className="setting-description">{t('settings.portRange.desc')}</p>
             </div>
             <div className="setting-control">
               <div className="port-range-input">
@@ -1015,15 +1042,15 @@ const SettingsPage: React.FC = () => {
     return (
       <>
         <div className="settings-category-header">
-          <h1 className="settings-category-title">Scheduler</h1>
-          <p className="settings-category-subtitle">Schedule when downloads are active</p>
+          <h1 className="settings-category-title">{t('settings.scheduler')}</h1>
+          <p className="settings-category-subtitle">{t('settings.sub.scheduler')}</p>
         </div>
 
         <div className="settings-group">
-          <h3 className="settings-group-title">SCHEDULER</h3>
+          <h3 className="settings-group-title">{t('settings.grp.scheduler')}</h3>
           {renderSettingItem(
-            'Enable Scheduler',
-            'Downloads will only be active during specified times',
+            t('settings.schedEnable'),
+            t('settings.schedEnable.desc'),
             renderToggle(schedulerEnabled, () => handleSchedulerToggle())
           )}
         </div>
@@ -1033,21 +1060,21 @@ const SettingsPage: React.FC = () => {
             <div className="settings-divider" />
             <div className="settings-group">
               <div className="settings-group-header">
-                <h3 className="settings-group-title">SCHEDULES</h3>
+                <h3 className="settings-group-title">{t('settings.grp.schedules')}</h3>
                 <Button
                   variant="ghost"
                   size="sm"
                   icon={<Icon name="plus" size={14} />}
                   onClick={handleAddSchedule}
                 >
-                  Add
+                  {t('settings.add')}
                 </Button>
               </div>
 
               {schedules.length === 0 ? (
                 <div className="empty-state-compact">
                   <Icon name="calendar" size={24} />
-                  <p>No schedules yet. Add your first one!</p>
+                  <p>{t('settings.noSchedules')}</p>
                 </div>
               ) : (
                 <div className="schedule-list">
@@ -1109,19 +1136,19 @@ const SettingsPage: React.FC = () => {
     return (
       <>
         <div className="settings-category-header">
-          <h1 className="settings-category-title">Seeding</h1>
-          <p className="settings-category-subtitle">Control ratio and time limits for all torrents</p>
+          <h1 className="settings-category-title">{t('settings.hdr.seeding')}</h1>
+          <p className="settings-category-subtitle">{t('settings.sub.seeding')}</p>
         </div>
 
         <div className="settings-group">
-          <h3 className="settings-group-title">DEFAULT SEEDING LIMITS</h3>
+          <h3 className="settings-group-title">{t('settings.grp.seedingLimits')}</h3>
           <p className="settings-group-desc">
-            These apply globally. Per-torrent limits can be set in the download context menu.
+            {t('settings.seedGlobalNote')}
           </p>
 
           {renderSettingItem(
-            'Seed Ratio Limit',
-            'Stop seeding when ratio reaches this value (0 = unlimited)',
+            t('settings.seedRatio'),
+            t('settings.seedRatio.desc'),
             <div className="speed-input-compact">
               <input
                 type="number"
@@ -1132,13 +1159,13 @@ const SettingsPage: React.FC = () => {
                 value={defaultSeedRatioLimit}
                 onChange={e => setDefaultSeedRatioLimit(parseFloat(e.target.value) || 0)}
               />
-              <span className="input-unit">ratio</span>
+              <span className="input-unit">{t('settings.unit.ratio')}</span>
             </div>
           )}
 
           {renderSettingItem(
-            'Seed Time Limit',
-            'Stop seeding after this many minutes (0 = unlimited)',
+            t('settings.seedTime'),
+            t('settings.seedTime.desc'),
             <div className="speed-input-compact">
               <input
                 type="number"
@@ -1149,7 +1176,7 @@ const SettingsPage: React.FC = () => {
                 value={defaultSeedTimeLimitMinutes}
                 onChange={e => setDefaultSeedTimeLimitMinutes(parseInt(e.target.value) || 0)}
               />
-              <span className="input-unit">min</span>
+              <span className="input-unit">{t('settings.unit.min')}</span>
             </div>
           )}
 
@@ -1157,10 +1184,10 @@ const SettingsPage: React.FC = () => {
             <div className="setting-info-box">
               <Icon name="info" size={14} />
               <span>
-                Seeding will stop when{' '}
-                {defaultSeedRatioLimit > 0 && <><strong>ratio ≥ {defaultSeedRatioLimit}</strong></>}
-                {defaultSeedRatioLimit > 0 && defaultSeedTimeLimitMinutes > 0 && ' or '}
-                {defaultSeedTimeLimitMinutes > 0 && <><strong>{defaultSeedTimeLimitMinutes} min elapsed</strong></>}
+                {t('settings.seedStopWhen')}{' '}
+                {defaultSeedRatioLimit > 0 && <><strong>{t('settings.seedRatioReached')} {defaultSeedRatioLimit}</strong></>}
+                {defaultSeedRatioLimit > 0 && defaultSeedTimeLimitMinutes > 0 && ` ${t('settings.or')} `}
+                {defaultSeedTimeLimitMinutes > 0 && <><strong>{defaultSeedTimeLimitMinutes} {t('settings.seedMinElapsed')}</strong></>}
               </span>
             </div>
           )}
@@ -1178,12 +1205,12 @@ const SettingsPage: React.FC = () => {
     return (
       <>
         <div className="settings-category-header">
-          <h1 className="settings-category-title">Interface & Themes</h1>
-          <p className="settings-category-subtitle">Customize appearance and visual style</p>
+          <h1 className="settings-category-title">{t('settings.hdr.interface')}</h1>
+          <p className="settings-category-subtitle">{t('settings.sub.interface')}</p>
         </div>
 
         <div className="settings-group">
-          <h3 className="settings-group-title">THEME</h3>
+          <h3 className="settings-group-title">{t('settings.grp.theme')}</h3>
           <div className="setting-item">
             <div className="setting-info">
               <div className="setting-label">{t('settings.theme')}</div>
@@ -1198,7 +1225,7 @@ const SettingsPage: React.FC = () => {
         <div className="settings-divider" />
 
         <div className="settings-group">
-          <h3 className="settings-group-title">LANGUAGE</h3>
+          <h3 className="settings-group-title">{t('settings.grp.language')}</h3>
           <div className="setting-item">
             <div className="setting-info">
               <div className="setting-label">{t('settings.language')}</div>
@@ -1224,31 +1251,31 @@ const SettingsPage: React.FC = () => {
     return (
       <>
         <div className="settings-category-header">
-          <h1 className="settings-category-title">Notifications</h1>
-          <p className="settings-category-subtitle">Configure notification preferences</p>
+          <h1 className="settings-category-title">{t('settings.notifications')}</h1>
+          <p className="settings-category-subtitle">{t('settings.sub.notifications')}</p>
         </div>
 
         <div className="settings-group">
-          <h3 className="settings-group-title">NOTIFICATIONS</h3>
+          <h3 className="settings-group-title">{t('settings.grp.notifications')}</h3>
           {renderSettingItem(
-            'Enable Notifications',
-            'Show desktop notifications',
-            renderToggle(enableNotifications, () => setEnableNotifications(!enableNotifications))
+            t('settings.notif.enable'),
+            t('settings.notif.enable.desc'),
+            renderToggle(enableNotifications, () => applyToggle(!enableNotifications, setEnableNotifications, { enableNotifications: !enableNotifications }))
           )}
           {renderSettingItem(
-            'Enable Sounds',
-            'Play sound with notifications',
-            renderToggle(enableSounds, () => setEnableSounds(!enableSounds))
+            t('settings.notif.sounds'),
+            t('settings.notif.sounds.desc'),
+            renderToggle(enableSounds, () => applyToggle(!enableSounds, setEnableSounds, { enableSounds: !enableSounds }))
           )}
           {renderSettingItem(
-            'Notify on Complete',
-            'Alert when download completes',
-            renderToggle(notifyOnComplete, () => setNotifyOnComplete(!notifyOnComplete))
+            t('settings.notif.complete'),
+            t('settings.notif.complete.desc'),
+            renderToggle(notifyOnComplete, () => applyToggle(!notifyOnComplete, setNotifyOnComplete, { notifyOnComplete: !notifyOnComplete }))
           )}
           {renderSettingItem(
-            'Notify on Error',
-            'Alert when error occurs',
-            renderToggle(notifyOnError, () => setNotifyOnError(!notifyOnError))
+            t('settings.notif.error'),
+            t('settings.notif.error.desc'),
+            renderToggle(notifyOnError, () => applyToggle(!notifyOnError, setNotifyOnError, { notifyOnError: !notifyOnError }))
           )}
         </div>
       </>
@@ -1259,26 +1286,26 @@ const SettingsPage: React.FC = () => {
     return (
       <>
         <div className="settings-category-header">
-          <h1 className="settings-category-title">System Integration</h1>
-          <p className="settings-category-subtitle">System-level settings and integration</p>
+          <h1 className="settings-category-title">{t('settings.hdr.system')}</h1>
+          <p className="settings-category-subtitle">{t('settings.sub.system')}</p>
         </div>
 
         <div className="settings-group">
-          <h3 className="settings-group-title">OS INTEGRATION</h3>
+          <h3 className="settings-group-title">{t('settings.grp.osIntegration')}</h3>
           <div className="setting-item">
             <div className="setting-info">
-              <div className="setting-label">Default Torrent Client</div>
-              <p className="setting-description">Open .torrent files and magnet links with TorrentHunt</p>
+              <div className="setting-label">{t('settings.defaultClient')}</div>
+              <p className="setting-description">{t('settings.defaultClient.desc')}</p>
             </div>
             <div className="setting-control">
               {isDefaultClient ? (
                 <span className="status-badge success" style={{ color: 'var(--color-success)', display: 'flex', alignItems: 'center', gap: '4px', fontSize: '13px' }}>
                   <Icon name="check-circle" size={14} />
-                  Current Default
+                  {t('settings.currentDefault')}
                 </span>
               ) : (
                 <Button variant="secondary" onClick={handleSetDefaultClient}>
-                  Set as Default
+                  {t('settings.setDefault')}
                 </Button>
               )}
             </div>
@@ -1288,14 +1315,14 @@ const SettingsPage: React.FC = () => {
         <div className="settings-divider" />
 
         <div className="settings-group">
-          <h3 className="settings-group-title">UPDATES</h3>
+          <h3 className="settings-group-title">{t('settings.grp.updates')}</h3>
           <div className="setting-item">
             <div className="setting-info">
-              <div className="setting-label">{updateReady ? 'Update ready' : 'Check for Updates'}</div>
+              <div className="setting-label">{updateReady ? t('settings.updateReady') : t('settings.checkUpdates')}</div>
               <p className="setting-description">
                 {updateReady
-                  ? `Version ${updateReady} downloaded. Restart to install.`
-                  : 'Look for new versions on GitHub.'}
+                  ? `${t('settings.versionWord')} ${updateReady} ${t('settings.downloadedRestart')}`
+                  : t('settings.checkUpdatesDesc')}
               </p>
             </div>
             <div className="setting-control">
@@ -1305,11 +1332,11 @@ const SettingsPage: React.FC = () => {
                   icon={<Icon name="refresh" size={16} />}
                   onClick={() => window.api.quitAndInstallUpdate()}
                 >
-                  Restart & Install
+                  {t('settings.restartInstall')}
                 </Button>
               ) : (
                 <Button variant="secondary" onClick={handleCheckForUpdates}>
-                  Check Now
+                  {t('settings.checkNow')}
                 </Button>
               )}
             </div>
@@ -1319,11 +1346,11 @@ const SettingsPage: React.FC = () => {
         <div className="settings-divider" />
 
         <div className="settings-group">
-          <h3 className="settings-group-title">MAINTENANCE</h3>
+          <h3 className="settings-group-title">{t('settings.grp.maintenance')}</h3>
           <div className="setting-item">
             <div className="setting-info">
-              <div className="setting-label">Clear Cache</div>
-              <p className="setting-description">Remove temporary files and cached data</p>
+              <div className="setting-label">{t('settings.clearCache')}</div>
+              <p className="setting-description">{t('settings.clearCache.desc')}</p>
             </div>
             <div className="setting-control">
               <Button
@@ -1333,7 +1360,7 @@ const SettingsPage: React.FC = () => {
                 loading={clearingCache}
                 disabled={clearingCache}
               >
-                Clear
+                {t('settings.clear')}
               </Button>
             </div>
           </div>
@@ -1342,26 +1369,26 @@ const SettingsPage: React.FC = () => {
         <div className="settings-divider" />
 
         <div className="settings-group">
-          <h3 className="settings-group-title">BACKUP</h3>
+          <h3 className="settings-group-title">{t('settings.grp.backup')}</h3>
           <div className="setting-item">
             <div className="setting-info">
-              <div className="setting-label">Export Settings</div>
-              <p className="setting-description">Save your configuration</p>
+              <div className="setting-label">{t('settings.exportSettings')}</div>
+              <p className="setting-description">{t('settings.exportSettings.desc')}</p>
             </div>
             <div className="setting-control">
               <Button variant="secondary" onClick={handleExportSettings}>
-                Export
+                {t('settings.export')}
               </Button>
             </div>
           </div>
           <div className="setting-item">
             <div className="setting-info">
-              <div className="setting-label">Import Settings</div>
-              <p className="setting-description">Restore saved configuration</p>
+              <div className="setting-label">{t('settings.importSettings')}</div>
+              <p className="setting-description">{t('settings.importSettings.desc')}</p>
             </div>
             <div className="setting-control">
               <Button variant="secondary" onClick={handleImportSettings}>
-                Import
+                {t('settings.import')}
               </Button>
             </div>
           </div>
@@ -1374,8 +1401,8 @@ const SettingsPage: React.FC = () => {
     return (
       <>
         <div className="settings-category-header">
-          <h1 className="settings-category-title">About TorrentHunt</h1>
-          <p className="settings-category-subtitle">Application information and statistics</p>
+          <h1 className="settings-category-title">{t('settings.hdr.about')}</h1>
+          <p className="settings-category-subtitle">{t('settings.sub.about')}</p>
         </div>
 
         <div className="about-section">
@@ -1383,9 +1410,9 @@ const SettingsPage: React.FC = () => {
             <div className="about-icon"><Icon name="download" size={28} /></div>
             <div className="about-info-text">
               <h2 className="about-app-name">TorrentHunt</h2>
-              <p className="about-version">Version {appVersion || '—'}</p>
+              <p className="about-version">{t('settings.version')} {appVersion || '—'}</p>
               <p className="about-description">
-                A desktop torrent client focused on legal open-source software distribution.
+                {t('settings.appDesc')}
               </p>
             </div>
           </div>
@@ -1393,7 +1420,7 @@ const SettingsPage: React.FC = () => {
           <div className="settings-divider" />
 
           <div className="settings-group">
-            <h3 className="settings-group-title">STATISTICS</h3>
+            <h3 className="settings-group-title">{t('settings.grp.statistics')}</h3>
             <AppStatistics
               totalDownloads={stats.totalDownloads}
               totalUploaded={stats.totalUploaded}
