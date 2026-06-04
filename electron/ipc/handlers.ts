@@ -113,6 +113,12 @@ export function setupIpcHandlers(mainWindow: BrowserWindow): void {
     }
   ));
 
+  ipcMain.handle('downloads:getStreamUrl', wrapHandler('downloads:getStreamUrl',
+    async (_event, id: string, fileIndex: number) => {
+      return torrentManager.getStreamUrl(id, fileIndex);
+    }
+  ));
+
   ipcMain.handle('downloads:getTorrentInfo', wrapHandler('downloads:getTorrentInfo',
     async (_event, params: { torrentPath?: string; magnetUri?: string }) => {
       return torrentManager.getTorrentInfo(params);

@@ -451,6 +451,14 @@ const dictionary = {
     'seeding.hourAgo': 'h ago',
     'seeding.dayAgo': 'd ago',
 
+    // In-app player
+    'player.watch': 'Watch / Listen',
+    'player.close': 'Close',
+    'player.buffering': 'Buffering…',
+    'player.noMedia': 'No playable video or audio files in this torrent.',
+    'player.unsupported': "This file's format/codec isn't supported by the built-in player. Try opening it in an external player.",
+    'player.note': 'Streaming from the torrent — playback starts before the download finishes.',
+
     // App statistics
     'stats.totalDownloads': 'Total Downloads',
     'stats.downloaded': 'Downloaded',
@@ -905,6 +913,14 @@ const dictionary = {
     'seeding.minAgo': 'мин назад',
     'seeding.hourAgo': 'ч назад',
     'seeding.dayAgo': 'дн назад',
+
+    // Встроенный плеер
+    'player.watch': 'Смотреть / Слушать',
+    'player.close': 'Закрыть',
+    'player.buffering': 'Буферизация…',
+    'player.noMedia': 'В этом торренте нет воспроизводимых видео или аудио.',
+    'player.unsupported': 'Формат/кодек этого файла не поддерживается встроенным плеером. Попробуйте открыть во внешнем плеере.',
+    'player.note': 'Стриминг прямо из торрента — воспроизведение начинается до завершения загрузки.',
 
     // Статистика приложения
     'stats.totalDownloads': 'Всего загрузок',

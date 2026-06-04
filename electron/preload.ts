@@ -53,6 +53,10 @@ const api: IpcApi = {
     return ipcRenderer.invoke('downloads:getFiles', id);
   },
 
+  getStreamUrl: (id: string, fileIndex: number): Promise<{ url: string; name: string; kind: 'video' | 'audio' | 'other' }> => {
+    return ipcRenderer.invoke('downloads:getStreamUrl', id, fileIndex);
+  },
+
   getTorrentInfo: (params: { torrentPath?: string; magnetUri?: string }): Promise<any> => {
     return ipcRenderer.invoke('downloads:getTorrentInfo', params);
   },

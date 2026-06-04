@@ -344,6 +344,8 @@ function applyContentSecurityPolicy(): void {
     "style-src 'self' 'unsafe-inline'", // CSS-in-JS / framer-motion inject inline styles
     "img-src 'self' data: https: http:", // posters, QR codes, remote thumbnails
     "font-src 'self' data:",
+    // Local-only WebTorrent streaming server (127.0.0.1:<random port>)
+    "media-src 'self' http://127.0.0.1:* http://localhost:*",
     "connect-src 'self'",
     "object-src 'none'",
     "frame-src 'none'",

@@ -4,6 +4,16 @@ All notable changes to TorrentHunt are documented here.
 This project follows [Keep a Changelog](https://keepachangelog.com/) and
 [Semantic Versioning](https://semver.org/).
 
+## [1.5.11-beta] - 2026-06-04
+
+### Added
+- **Watch / listen while downloading.** A new in-app player streams video and
+  audio straight from a torrent — playback starts before the download finishes
+  (sequential, on demand). Right-click a download → **Watch / Listen**. Supports
+  switching between multiple media files in a torrent. Built on WebTorrent's
+  local streaming server (127.0.0.1 only). Codec support follows the built-in
+  Chromium player (MP4/H.264, WebM, Ogg play best).
+
 ## [1.5.10-beta] - 2026-06-04
 
 ### Fixed
@@ -70,6 +80,7 @@ This project follows [Keep a Changelog](https://keepachangelog.com/) and
 - Real encryption / anonymity options, VPN kill-switch, disk-space guard,
   and torrent health indicators.
 
+[1.5.11-beta]: https://github.com/NIHILcoder/TorrentHunt/releases/tag/v1.5.11-beta
 [1.5.10-beta]: https://github.com/NIHILcoder/TorrentHunt/releases/tag/v1.5.10-beta
 [1.5.9-beta]: https://github.com/NIHILcoder/TorrentHunt/releases/tag/v1.5.9-beta
 [1.5.8-beta]: https://github.com/NIHILcoder/TorrentHunt/releases/tag/v1.5.8-beta

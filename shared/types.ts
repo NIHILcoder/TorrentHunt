@@ -373,6 +373,7 @@ export interface IpcApi {
   retryDownload: (id: string) => Promise<void>;
   getDownloads: () => Promise<Download[]>;
   getTorrentFiles: (id: string) => Promise<TorrentFile[]>;
+  getStreamUrl: (id: string, fileIndex: number) => Promise<{ url: string; name: string; kind: 'video' | 'audio' | 'other' }>;
   getTorrentInfo: (params: { torrentPath?: string; magnetUri?: string }) => Promise<TorrentInfo>;
   setDownloadCategory: (id: string, category: string | null) => Promise<void>;
   getAppStats: () => Promise<{

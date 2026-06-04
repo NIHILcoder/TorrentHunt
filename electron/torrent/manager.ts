@@ -24,6 +24,7 @@ import {
 } from '../../shared/state-machine';
 import * as db from '../db/store';
 import { logger, checkDiskSpace, formatBytes } from '../utils';
+import { classifyMediaKind } from '../../shared/media';
 
 const log = logger.child('TorrentManager');
 
@@ -33,10 +34,15 @@ interface ManagedTorrent {
   download: Download;
   infoHash: string | null;
   selectedFiles?: number[];
+  // Lazily-created per-torrent HTTP server used for in-app streaming. Bound to
+  // the specific torrent instance it was created for (torrents are recreated on
+  // pause/resume), so we can tell when it has gone stale.
+  streamServer?: { server: any; port: number; torrent: Torrent } | null;
 }
 
 type StatsCallback = (stats: DownloadStats[]) => void;
 type CompletionCallback = (info: { id: string; name: string }) => void;
+
 
 /**
  * Error class for torrent operation failures
@@ -1026,6 +1032,7 @@ export class TorrentManager {
     // Data on disk is preserved (destroyStore: false).
     if (managed.torrent) {
       log.debug('Destroying torrent instance for pause', { id, infoHash: managed.infoHash });
+      this.closeStreamServer(managed);
       try {
         managed.torrent.destroy({ destroyStore: false } as any);
       } catch (e) {
@@ -1064,6 +1071,7 @@ export class TorrentManager {
     if (managed.torrent) {
       // Torrent still in memory but shouldn't be — destroy it cleanly first
       log.debug('Torrent still in memory on resume, destroying first', { id });
+      this.closeStreamServer(managed);
       try {
         managed.torrent.destroy({ destroyStore: false } as any);
       } catch (_) { /* ignore */ }
@@ -1093,6 +1101,9 @@ export class TorrentManager {
     if (managed.infoHash) {
       this.infoHashIndex.delete(managed.infoHash);
     }
+
+    // Stop any active stream server first
+    this.closeStreamServer(managed);
 
     // Remove from WebTorrent if torrent exists
     if (managed.torrent) {
@@ -1267,8 +1278,76 @@ export class TorrentManager {
         progress: file.progress || (file.length > 0 ? file.downloaded / file.length : 0),
       }));
     }
-    
+
     return [];
+  }
+
+  /**
+   * Close and forget a managed torrent's streaming server (if any).
+   * Called whenever the underlying torrent is destroyed (pause/resume/remove)
+   * or on shutdown, so we never leak HTTP servers or point at a dead torrent.
+   */
+  private closeStreamServer(managed: ManagedTorrent): void {
+    const s = managed.streamServer;
+    if (!s) return;
+    managed.streamServer = null;
+    try {
+      if (typeof s.server.destroy === 'function') s.server.destroy();
+      else s.server.close();
+    } catch (e) {
+      log.warn('Failed to close stream server', { id: managed.id, error: String(e) });
+    }
+  }
+
+  /**
+   * Return a local HTTP URL for streaming a file inside a torrent. WebTorrent's
+   * per-torrent server supports HTTP Range requests, and reading a byte range
+   * prioritises those pieces — so playback works while the torrent is still
+   * downloading (sequential, on demand). The server binds to 127.0.0.1 only.
+   */
+  async getStreamUrl(id: string, fileIndex: number): Promise<{ url: string; name: string; kind: 'video' | 'audio' | 'other' }> {
+    const managed = this.managedTorrents.get(id);
+    if (!managed) {
+      throw new TorrentError('Download not found', 'NOT_FOUND', id);
+    }
+    const torrent = managed.torrent;
+    if (!torrent || !torrent.files || torrent.files.length === 0) {
+      throw new TorrentError('Torrent is not active (resume it to stream)', 'NOT_ACTIVE', id);
+    }
+    if (fileIndex < 0 || fileIndex >= torrent.files.length) {
+      throw new TorrentError('Invalid file index', 'INVALID_INPUT', id);
+    }
+
+    const file = torrent.files[fileIndex];
+    // Make sure the file is selected so its pieces actually download.
+    try { (file as any).select(); } catch { /* ignore */ }
+
+    // Reuse the server only if it belongs to the current torrent instance.
+    if (managed.streamServer && managed.streamServer.torrent !== torrent) {
+      this.closeStreamServer(managed);
+    }
+
+    if (!managed.streamServer) {
+      const server = (torrent as any).createServer();
+      await new Promise<void>((resolve, reject) => {
+        try {
+          server.listen(0, '127.0.0.1', () => resolve());
+          server.on('error', reject);
+        } catch (e) {
+          reject(e);
+        }
+      });
+      const port = server.address().port;
+      managed.streamServer = { server, port, torrent };
+      log.info('Stream server started', { id, port });
+    }
+
+    const port = managed.streamServer.port;
+    return {
+      url: `http://127.0.0.1:${port}/${fileIndex}`,
+      name: file.name,
+      kind: classifyMediaKind(file.name),
+    };
   }
   
   /**
@@ -1628,7 +1707,12 @@ export class TorrentManager {
     
     // Clear all stats callbacks to prevent memory leaks
     this.statsCallbacks.clear();
-    
+
+    // Close any open streaming servers
+    for (const managed of this.managedTorrents.values()) {
+      this.closeStreamServer(managed);
+    }
+
     // Save final stats (single batched write, speeds zeroed since we're stopping)
     try {
       const stats = this.getStats();

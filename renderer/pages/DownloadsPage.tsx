@@ -21,6 +21,7 @@ import {
   ContextMenuItem,
   TorrentFileSelector,
   TorrentControlModal,
+  StreamPlayerModal,
 } from '../components';
 import { useTranslation } from '../utils/i18nContext';
 import './DownloadsPage.css';
@@ -595,6 +596,8 @@ const DownloadsPage: React.FC<DownloadsPageProps> = ({
   // Torrent control modal
   const [controlModalId, setControlModalId] = useState<string | null>(null);
   const controlModalDownload = controlModalId ? downloads.find(d => d.id === controlModalId) : null;
+  const [streamModalId, setStreamModalId] = useState<string | null>(null);
+  const streamModalDownload = streamModalId ? downloads.find(d => d.id === streamModalId) : null;
 
   // Refs
   const searchInputRef = useRef<HTMLInputElement>(null);
@@ -1585,6 +1588,14 @@ const DownloadsPage: React.FC<DownloadsPageProps> = ({
           y={contextMenu.y}
           items={[
             {
+              label: 'Watch / Listen',
+              icon: 'play',
+              onClick: () => {
+                setStreamModalId(contextMenu.downloadId);
+                setContextMenu(null);
+              }
+            },
+            {
               label: 'Advanced Controls...',
               icon: 'settings',
               onClick: () => {
@@ -1651,6 +1662,15 @@ const DownloadsPage: React.FC<DownloadsPageProps> = ({
           download={controlModalDownload}
           onClose={() => setControlModalId(null)}
           onUpdate={loadDownloads}
+        />
+      )}
+
+      {/* In-app stream player */}
+      {streamModalDownload && (
+        <StreamPlayerModal
+          downloadId={streamModalDownload.id}
+          downloadName={streamModalDownload.name}
+          onClose={() => setStreamModalId(null)}
         />
       )}
     </div>
