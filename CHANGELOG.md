@@ -4,6 +4,19 @@ All notable changes to TorrentHunt are documented here.
 This project follows [Keep a Changelog](https://keepachangelog.com/) and
 [Semantic Versioning](https://semver.org/).
 
+## [1.5.21-beta] - 2026-06-05
+
+### Added
+- **QR code for share links.** The share dialog can now show a QR code to open
+  the link on a phone. QR generation now uses a real library, so the codes are
+  actually scannable (this also fixes the previously non-functional magnet QR on
+  the "Torrent Created" screen).
+
+### Fixed
+- **Theme picker layout.** The "Color scheme" label and theme cards no longer
+  drift across the panel as the window widens — the row is left-aligned and the
+  cards keep a sensible width.
+
 ## [1.5.20-beta] - 2026-06-04
 
 ### Fixed
@@ -175,6 +188,7 @@ This project follows [Keep a Changelog](https://keepachangelog.com/) and
 - Real encryption / anonymity options, VPN kill-switch, disk-space guard,
   and torrent health indicators.
 
+[1.5.21-beta]: https://github.com/NIHILcoder/TorrentHunt/releases/tag/v1.5.21-beta
 [1.5.20-beta]: https://github.com/NIHILcoder/TorrentHunt/releases/tag/v1.5.20-beta
 [1.5.19-beta]: https://github.com/NIHILcoder/TorrentHunt/releases/tag/v1.5.19-beta
 [1.5.18-beta]: https://github.com/NIHILcoder/TorrentHunt/releases/tag/v1.5.18-beta

@@ -8,6 +8,7 @@
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Icon } from './Icon';
+import { QRCode } from './QRCode';
 import { useTranslation } from '../utils/i18nContext';
 import { ShareInfo } from '../../shared/types';
 import './ShareLinkModal.css';
@@ -26,6 +27,7 @@ export const ShareLinkModal: React.FC<ShareLinkModalProps> = ({ downloadId, down
   const [copied, setCopied] = useState(false);
   const [peers, setPeers] = useState(0);
   const [stopping, setStopping] = useState(false);
+  const [showQR, setShowQR] = useState(false);
   const pollRef = useRef<number | null>(null);
 
   // Start sharing as soon as the modal opens.
@@ -129,10 +131,20 @@ export const ShareLinkModal: React.FC<ShareLinkModalProps> = ({ downloadId, down
               <div className="share-status">
                 <span className="share-live-dot" />
                 <span>{t('share.live')}</span>
+                <button className="share-qr-toggle" onClick={() => setShowQR(v => !v)}>
+                  <Icon name="grid" size={12} /> {showQR ? t('share.hideQr') : t('share.showQr')}
+                </button>
                 <span className="share-peers">
                   <Icon name="users" size={12} /> {peers} {t('share.peers')}
                 </span>
               </div>
+
+              {showQR && (
+                <div className="share-qr">
+                  <QRCode data={share.link} size={184} />
+                  <span className="share-qr-hint">{t('share.qrHint')}</span>
+                </div>
+              )}
 
               <div className="share-note">
                 <Icon name="info" size={13} />

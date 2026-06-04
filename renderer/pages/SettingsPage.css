@@ -120,16 +120,29 @@
 }
 
 /* Stacked variant: label/description on top, a full-width control below.
-   Used for wide controls (e.g. the theme picker grid) that don't fit inline. */
+   Used for wide controls (e.g. the theme picker grid) that don't fit inline.
+   Everything is left-aligned and the control is a plain block so its content
+   can't drift/centre on wide screens. */
 .setting-item-stacked {
   flex-direction: column;
-  align-items: stretch;
+  align-items: flex-start;
   gap: 14px;
 }
 
-.setting-item-stacked .setting-control {
+.setting-item-stacked .setting-info {
+  flex: none;
   width: 100%;
-  flex-shrink: 1;
+}
+
+.setting-item-stacked .setting-control {
+  display: block;
+  width: 100%;
+}
+
+/* Keep the theme cards a sensible size and anchored left instead of stretching
+   across the whole settings panel as the window widens. */
+.setting-item-stacked .theme-selector-grid {
+  max-width: 540px;
 }
 
 .setting-info {

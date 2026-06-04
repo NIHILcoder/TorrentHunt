@@ -475,6 +475,9 @@ const dictionary = {
     'share.peers': 'connected',
     'share.note': 'Keep TorrentHunt open while people download. The transfer is peer-to-peer (WebRTC) — nothing is uploaded to a server.',
     'share.stop': 'Stop sharing',
+    'share.showQr': 'QR',
+    'share.hideQr': 'Hide QR',
+    'share.qrHint': 'Scan to open the link on a phone',
 
     // App statistics
     'stats.totalDownloads': 'Total Downloads',
@@ -955,6 +958,9 @@ const dictionary = {
     'share.peers': 'подключено',
     'share.note': 'Держите TorrentHunt открытым, пока скачивают. Передача напрямую (WebRTC) — ничего не загружается на сервер.',
     'share.stop': 'Остановить',
+    'share.showQr': 'QR',
+    'share.hideQr': 'Скрыть QR',
+    'share.qrHint': 'Отсканируйте, чтобы открыть ссылку на телефоне',
 
     // Статистика приложения
     'stats.totalDownloads': 'Всего загрузок',
