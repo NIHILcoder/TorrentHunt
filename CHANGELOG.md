@@ -4,6 +4,20 @@ All notable changes to TorrentHunt are documented here.
 This project follows [Keep a Changelog](https://keepachangelog.com/) and
 [Semantic Versioning](https://semver.org/).
 
+## [1.5.22-beta] - 2026-06-05
+
+### Fixed
+- **Custom-named created torrents now seed (not stuck at 0%).** "Start seeding"
+  now seeds the original files straight from disk, so renaming the torrent in the
+  Create dialog no longer breaks the content mapping. Sharing such a torrent uses
+  the real source path too.
+
+### Changed
+- **Much shorter share links.** A share link now carries only the torrent's
+  infoHash; the receiver page rebuilds the magnet (adding the trackers itself).
+  Links are now short and constant-length regardless of the file name — which
+  also makes the share QR code far less dense. Older long links still work.
+
 ## [1.5.21-beta] - 2026-06-05
 
 ### Added
@@ -188,6 +202,7 @@ This project follows [Keep a Changelog](https://keepachangelog.com/) and
 - Real encryption / anonymity options, VPN kill-switch, disk-space guard,
   and torrent health indicators.
 
+[1.5.22-beta]: https://github.com/NIHILcoder/TorrentHunt/releases/tag/v1.5.22-beta
 [1.5.21-beta]: https://github.com/NIHILcoder/TorrentHunt/releases/tag/v1.5.21-beta
 [1.5.20-beta]: https://github.com/NIHILcoder/TorrentHunt/releases/tag/v1.5.20-beta
 [1.5.19-beta]: https://github.com/NIHILcoder/TorrentHunt/releases/tag/v1.5.19-beta

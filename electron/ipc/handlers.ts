@@ -129,7 +129,11 @@ export function setupIpcHandlers(mainWindow: BrowserWindow): void {
       if (!isComplete) {
         throw new TorrentError('Download must be complete to share', 'NOT_COMPLETE', downloadId);
       }
-      const contentPath = downloadContentPath(download.savePath, download.name);
+      // For "start seeding" entries the content lives at the original source
+      // path (the on-disk name may differ from the custom torrent name).
+      const contentPath = (download.seedPaths && download.seedPaths.length === 1)
+        ? download.seedPaths[0]
+        : downloadContentPath(download.savePath, download.name);
       return getShareManager().share(downloadId, contentPath, download.name);
     }
   ));
@@ -482,18 +486,16 @@ export function setupIpcHandlers(mainWindow: BrowserWindow): void {
       
       const result = await createTorrentFile(request, mainWindow);
       
-      // If startSeeding is true, add the created torrent for seeding
+      // If startSeeding is true, seed the created torrent from the source files
+      // on disk (so a custom name can't break the content mapping → 0% stall).
       if (request.startSeeding && result.torrentFilePath) {
         log.info('Auto-starting seeding for created torrent', { infoHash: result.infoHash });
-        
-        // Determine source folder (parent of the first source path)
-        const sourceFolder = path.dirname(request.sourcePaths[0]);
-        
-        await torrentManager.addDownload({
-          sourceType: 'torrent_file',
-          sourceUri: result.torrentFilePath,
-          savePath: sourceFolder,
+        await torrentManager.addSeed({
+          sourcePaths: request.sourcePaths,
           name: request.options.name,
+          announceList: request.options.announceList,
+          pieceLength: request.options.pieceLength,
+          torrentFilePath: result.torrentFilePath,
         });
       }
       

@@ -79,7 +79,9 @@ function doShare(downloadId: string, contentPath: string, name: string): Promise
           downloadId, name,
           infoHash: torrent.infoHash,
           magnetURI: torrent.magnetURI,
-          link: RECEIVER_BASE + '#' + encodeURIComponent(torrent.magnetURI),
+          // Short, name-independent link: just the infoHash. The receiver page
+          // reconstructs the magnet with its (matching) tracker list.
+          link: RECEIVER_BASE + '#' + torrent.infoHash,
           createdAt: Date.now(),
         };
         shares.set(downloadId, entry);

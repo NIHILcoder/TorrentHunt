@@ -119,6 +119,7 @@ export async function createDownload(data: {
   savePath: string;
   status: 'queued' | 'downloading' | 'paused' | 'completed' | 'seeding' | 'error' | 'removed';
   selectedFiles?: number[];
+  seedPaths?: string[];
 }): Promise<Download> {
   const id = uuidv4();
   const now = new Date();
@@ -143,6 +144,7 @@ export async function createDownload(data: {
     priority: 0,
     category: null,
     selectedFiles: data.selectedFiles,
+    seedPaths: data.seedPaths,
     createdAt: now,
     updatedAt: now,
     lastError: null,

@@ -89,9 +89,24 @@
     }
     function fail(msg) { setStatus(msg, false); $('status').className = 'error'; }
 
+    // The link carries either a bare infoHash (new, short links) or a full
+    // magnet (older links). For an infoHash we rebuild the magnet here, adding
+    // the same WebSocket trackers the desktop seeder announces to.
+    var TRACKERS = [
+      'wss://tracker.openwebtorrent.com',
+      'wss://tracker.webtorrent.dev',
+      'wss://tracker.files.fm:7073/announce'
+    ];
+    var raw = '';
+    try { raw = decodeURIComponent(location.hash.replace(/^#/, '')); } catch (e) {}
     var magnet = '';
-    try { magnet = decodeURIComponent(location.hash.replace(/^#/, '')); } catch (e) {}
-    if (!magnet || magnet.indexOf('magnet:') !== 0) {
+    if (raw.indexOf('magnet:') === 0) {
+      magnet = raw;
+    } else if (/^[a-fA-F0-9]{40}$/.test(raw) || /^[a-zA-Z2-7]{32}$/.test(raw)) {
+      magnet = 'magnet:?xt=urn:btih:' + raw +
+        TRACKERS.map(function (t) { return '&tr=' + encodeURIComponent(t); }).join('');
+    }
+    if (!magnet) {
       fail('Invalid or missing share link.');
       return;
     }

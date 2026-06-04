@@ -31,6 +31,10 @@ export interface Download {
   priority: number; // 0 = low, 1 = normal, 2 = high
   category: string | null;
   selectedFiles?: number[];
+  // Source files to seed directly from disk (set for torrents created with
+  // "start seeding"). When present the engine seeds these paths instead of
+  // trying to download by name — so a custom torrent name can't break it.
+  seedPaths?: string[];
   // Priority 1 new fields
   sequentialDownload?: boolean;
   seedRatioLimit?: number;           // Stop seeding at this ratio (0 = unlimited)

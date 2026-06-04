@@ -83,6 +83,9 @@ export class TorrentManager {
   private client: WebTorrent.Instance;
   private managedTorrents: Map<string, ManagedTorrent> = new Map();
   private infoHashIndex: Map<string, string> = new Map();
+  // Creation options for "start seeding" entries, used the first time they seed
+  // so the infoHash matches the .torrent the user just created.
+  private seedOptionsCache: Map<string, { announceList?: string[][]; pieceLength?: number }> = new Map();
   // Shared on-the-fly transcoding server (ffmpeg → fragmented MP4) for formats
   // Chromium can't play directly (avi, mkv, HEVC, …). Started lazily.
   private transcodeServer: http.Server | null = null;
@@ -701,6 +704,122 @@ export class TorrentManager {
   }
 
   /**
+   * Add a "start seeding" entry for a freshly-created torrent. Seeds the actual
+   * source files from disk (client.seed) so a custom torrent name can't break
+   * the content mapping (which would leave it stuck at 0%).
+   */
+  async addSeed(params: {
+    sourcePaths: string[];
+    name?: string;
+    announceList?: string[][];
+    pieceLength?: number;
+    torrentFilePath?: string;
+  }): Promise<Download> {
+    const sourceFolder = path.dirname(params.sourcePaths[0]);
+    const download = await db.createDownload({
+      name: params.name || path.basename(params.sourcePaths[0]),
+      sourceType: 'torrent_file',
+      sourceUri: params.sourcePaths[0],
+      torrentFilePath: params.torrentFilePath,
+      savePath: sourceFolder,
+      status: 'queued',
+      seedPaths: params.sourcePaths,
+    });
+
+    this.managedTorrents.set(download.id, {
+      id: download.id,
+      torrent: null,
+      download,
+      infoHash: null,
+    });
+    this.seedOptionsCache.set(download.id, {
+      announceList: params.announceList,
+      pieceLength: params.pieceLength,
+    });
+
+    await this.processQueue();
+    return download;
+  }
+
+  /**
+   * Seed existing files from disk (used by "start seeding"). The torrent is
+   * complete on arrival, so it goes straight to the seeding state.
+   */
+  private async addSeedInternal(id: string, paths: string[], _savePath: string): Promise<void> {
+    return new Promise((resolve, reject) => {
+      const managed = this.managedTorrents.get(id);
+      if (!managed) { reject(new TorrentError('Download not found', 'NOT_FOUND', id)); return; }
+
+      const opts = this.seedOptionsCache.get(id) || {};
+      const seedOpts: any = { name: managed.download.name };
+      if (opts.announceList && opts.announceList.length) seedOpts.announceList = opts.announceList;
+      if (opts.pieceLength) seedOpts.pieceLength = opts.pieceLength;
+
+      let settled = false;
+      const fail = (e: any) => {
+        if (settled) return; settled = true;
+        reject(e instanceof Error ? e : new Error(String(e)));
+      };
+
+      try {
+        this.client.seed(paths, seedOpts, async (torrent: any) => {
+          if (settled) return; settled = true;
+          try {
+            managed.torrent = torrent;
+            const infoHash = torrent.infoHash;
+
+            const duplicateId = this.getDuplicateByInfoHash(infoHash, id);
+            if (duplicateId) {
+              try { this.client.remove(torrent); } catch { /* ignore */ }
+              managed.torrent = null;
+              await db.deleteDownload(id);
+              this.managedTorrents.delete(id);
+              reject(new TorrentError('This torrent is already added', 'DUPLICATE', id));
+              return;
+            }
+
+            managed.infoHash = infoHash;
+            this.infoHashIndex.set(infoHash, id);
+            managed.download.name = torrent.name || managed.download.name;
+            managed.download.totalSize = torrent.length || 0;
+
+            (torrent as unknown as NodeJS.EventEmitter).on('error', (err: Error) => {
+              log.error('Seed torrent error', { id, error: err?.message || String(err) });
+            });
+
+            // Already complete: queued → downloading → seeding.
+            await this.transitionStatus(id, 'downloading').catch(() => {});
+            await this.transitionStatus(id, 'seeding').catch(() => {});
+            await db.updateDownloadField(id, 'seedingStartedAt', Date.now());
+            managed.download.seedingStartedAt = Date.now();
+            await db.updateDownloadProgress(id, {
+              progress: 1,
+              downloadedBytes: torrent.length || 0,
+              uploadedBytes: 0,
+              downSpeedBps: 0,
+              upSpeedBps: 0,
+              etaSeconds: null,
+              peers: torrent.numPeers || 0,
+              seeds: 0,
+              name: torrent.name,
+              totalSize: torrent.length || 0,
+            });
+
+            this.seedOptionsCache.delete(id);
+            log.info('Seeding created torrent', { id, infoHash, name: torrent.name });
+            resolve();
+          } catch (e) {
+            fail(e);
+          }
+        });
+        this.client.once('error', fail);
+      } catch (e) {
+        fail(e);
+      }
+    });
+  }
+
+  /**
    * Internal method to add torrent to WebTorrent client
    */
   private async addTorrentInternal(
@@ -912,6 +1031,13 @@ export class TorrentManager {
 
       if (managed && !managed.torrent) {
         try {
+          // "Start seeding" entries seed the original files from disk.
+          if (download.seedPaths && download.seedPaths.length > 0) {
+            log.debug('Starting queued seed', { id: download.id });
+            await this.addSeedInternal(download.id, download.seedPaths, download.savePath);
+            continue;
+          }
+
           let source: string;
           if (download.sourceType === 'torrent_file' && download.torrentFilePath) {
             source = download.torrentFilePath;
