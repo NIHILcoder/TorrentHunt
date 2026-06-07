@@ -4,6 +4,16 @@ All notable changes to TorrentHunt are documented here.
 This project follows [Keep a Changelog](https://keepachangelog.com/) and
 [Semantic Versioning](https://semver.org/).
 
+## [1.6.3-beta] - 2026-06-07
+
+### Fixed
+- **Cast: AVI (and other old formats) now play on other devices.** AVI/WMV/FLV/MPG
+  and similar containers have irregular timestamps that broke the seek-friendly
+  HLS transcode (mp4/mkv were unaffected). They're now streamed as a single-pass
+  MP4 that plays reliably (seeking limited for these formats). Also added an 8s
+  watchdog: if HLS shows no picture on any file, the player automatically switches
+  to the MP4 stream.
+
 ## [1.6.2-beta] - 2026-06-07
 
 ### Fixed
@@ -291,6 +301,7 @@ This project follows [Keep a Changelog](https://keepachangelog.com/) and
 - Real encryption / anonymity options, VPN kill-switch, disk-space guard,
   and torrent health indicators.
 
+[1.6.3-beta]: https://github.com/NIHILcoder/TorrentHunt/releases/tag/v1.6.3-beta
 [1.6.2-beta]: https://github.com/NIHILcoder/TorrentHunt/releases/tag/v1.6.2-beta
 [1.6.1-beta]: https://github.com/NIHILcoder/TorrentHunt/releases/tag/v1.6.1-beta
 [1.6.0-beta]: https://github.com/NIHILcoder/TorrentHunt/releases/tag/v1.6.0-beta

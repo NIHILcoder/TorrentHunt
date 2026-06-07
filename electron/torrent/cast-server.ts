@@ -157,6 +157,10 @@ export class CastServer {
     const directUrl = `/direct${base}${q}`;
     const masterUrl = `/hls${base}/master.m3u8${q}`;
     const streamUrl = `/stream${base}${q}`;
+    // Old containers (avi/wmv/flv/mpg…) have messy timestamps that break the
+    // per-segment HLS transcode — play them via the single-pass MP4 stream, which
+    // is bulletproof. mkv/HEVC keep HLS (seeking).
+    const progressiveFirst = prefersProgressive(info.name);
     // info.direct files play natively with a plain <video>; everything else uses
     // HLS (native on Safari/iOS, hls.js elsewhere). A failed direct play also
     // upgrades to HLS, covering MP4s with an unsupported codec (e.g. HEVC).
@@ -182,32 +186,40 @@ export class CastServer {
 (function(){
   var v=document.getElementById('v'), m=document.getElementById('m');
   var DIRECT=${info.direct ? 'true' : 'false'};
+  var PROGRESSIVE_FIRST=${progressiveFirst ? 'true' : 'false'};
   var directUrl=${JSON.stringify(directUrl)};
   var masterUrl=${JSON.stringify(masterUrl)};
   var streamUrl=${JSON.stringify(streamUrl)};
+  var fellBack=false, watchdog=null;
   function say(t,err){ m.textContent=t||''; m.className='msg'+(err?' err':''); }
   function clearSrc(){ try{ v.removeAttribute('src'); v.load(); }catch(e){} }
+  function stopWatchdog(){ if(watchdog){ clearTimeout(watchdog); watchdog=null; } }
+  v.addEventListener('playing',function(){ stopWatchdog(); say(''); });
   // Last resort: a single-pass transcoded MP4 stream. Plays anything; no seeking.
   function playProgressive(){
-    clearSrc(); say('Converting — playback starts shortly (seeking is limited)…');
+    if (fellBack) return; fellBack=true; stopWatchdog();
+    try{ if(window._hls){ window._hls.destroy(); window._hls=null; } }catch(e){}
+    clearSrc(); say('Converting — playback starts shortly (seeking is limited on this format)…');
     v.src=streamUrl;
-    v.addEventListener('playing',function(){ say(''); },{once:true});
     v.addEventListener('error',function(){ say('Could not play this file on this device.',true); },{once:true});
     v.play&&v.play().catch(function(){});
   }
   function playHls(){
     say(''); clearSrc();
+    // If HLS produces no playable frame within 8s, drop to the MP4 stream.
+    stopWatchdog(); watchdog=setTimeout(playProgressive, 8000);
     if (v.canPlayType('application/vnd.apple.mpegurl')) { v.src=masterUrl; v.play&&v.play().catch(function(){}); return; }
     if (window.Hls && window.Hls.isSupported()) {
-      var hls=new window.Hls({maxBufferLength:30});
+      var hls=new window.Hls({maxBufferLength:30}); window._hls=hls;
       hls.loadSource(masterUrl); hls.attachMedia(v);
-      // If HLS fails on this file/device, fall back to the progressive stream.
-      hls.on(window.Hls.Events.ERROR,function(_e,d){ if(d&&d.fatal){ try{hls.destroy();}catch(e){} playProgressive(); } });
+      hls.on(window.Hls.Events.ERROR,function(_e,d){ if(d&&d.fatal){ playProgressive(); } });
     } else { playProgressive(); }
   }
   if (DIRECT){
     v.src=directUrl;
     v.addEventListener('error',function(){ playHls(); },{once:true});
+  } else if (PROGRESSIVE_FIRST){
+    playProgressive();
   } else { playHls(); }
 })();
 </script>
@@ -385,6 +397,13 @@ export class CastServer {
     if (this.server) { try { this.server.close(); } catch { /* ignore */ } this.server = null; }
     log.info('Cast server destroyed');
   }
+}
+
+// Containers with messy/non-monotonic timestamps that break the per-segment HLS
+// transcode — stream these as a single-pass MP4 instead (reliable, no seeking).
+const PROGRESSIVE_EXTS = new Set(['avi', 'wmv', 'flv', 'mpg', 'mpeg', 'vob', 'asf', 'divx', 'rm', 'rmvb', '3gp', 'ogm']);
+function prefersProgressive(name: string): boolean {
+  return PROGRESSIVE_EXTS.has(name.split('.').pop()?.toLowerCase() || '');
 }
 
 function directContentType(name: string): string {
