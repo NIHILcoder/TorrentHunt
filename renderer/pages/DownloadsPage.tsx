@@ -79,6 +79,8 @@ interface DownloadItemProps {
   download: Download;
   stats: DownloadStats | undefined;
   viewMode: ViewMode;
+  expanded?: boolean;
+  onToggleExpand?: (id: string) => void;
   isSelected?: boolean;
   onSelect?: (id: string) => void;
   onContextMenu?: (e: React.MouseEvent, id: string) => void;
@@ -95,6 +97,8 @@ const DownloadItem: React.FC<DownloadItemProps> = ({
   download,
   stats,
   viewMode,
+  expanded = false,
+  onToggleExpand,
   isSelected = false,
   onSelect,
   onContextMenu,
@@ -132,10 +136,14 @@ const DownloadItem: React.FC<DownloadItemProps> = ({
     return 'default';
   };
 
-  if (viewMode === 'compact') {
+  // A row shows its full stats when globally in "detailed" mode OR when the user
+  // has expanded just this one (accordion). Default is the compact row.
+  const detailed = viewMode === 'detailed' || expanded;
+
+  if (!detailed) {
     return (
       <div
-        className={`download-item download-item-compact ${isSelected ? 'selected' : ''}`}
+        className={`download-item download-item-compact download-st-${status} ${isSelected ? 'selected' : ''}`}
         onContextMenu={(e) => onContextMenu?.(e, download.id)}
       >
         {onSelect && (
@@ -147,7 +155,15 @@ const DownloadItem: React.FC<DownloadItemProps> = ({
             onClick={(e) => e.stopPropagation()}
           />
         )}
-        <div className="download-compact-main">
+        <div
+          className="download-compact-main"
+          onClick={() => onToggleExpand?.(download.id)}
+          role="button"
+          title="Click for details"
+        >
+          <span className={`download-expand-chevron ${expanded ? 'expanded' : ''}`}>
+            <Icon name="chevron-down" size={14} />
+          </span>
           <StatusBadge status={status} />
           <div className="download-compact-info">
             <span className="download-item-name truncate">{download.name}</span>
@@ -204,6 +220,17 @@ const DownloadItem: React.FC<DownloadItemProps> = ({
               icon={<Icon name="pause" size={14} />}
               onClick={() => onPause(download.id)}
               title="Pause"
+            />
+          )}
+
+          {(status === 'completed' || status === 'seeding') && (
+            <Button
+              variant="ghost"
+              size="sm"
+              iconOnly
+              icon={<Icon name="folder" size={14} />}
+              onClick={() => onOpenFolder(download.savePath)}
+              title="Open folder"
             />
           )}
 
@@ -285,7 +312,7 @@ const DownloadItem: React.FC<DownloadItemProps> = ({
   // Detailed view
   return (
     <div
-      className={`download-item download-item-detailed ${isSelected ? 'selected' : ''}`}
+      className={`download-item download-item-detailed download-st-${status} ${isSelected ? 'selected' : ''}`}
       onContextMenu={(e) => onContextMenu?.(e, download.id)}
     >
       {onSelect && (
@@ -298,7 +325,14 @@ const DownloadItem: React.FC<DownloadItemProps> = ({
         />
       )}
       <div className="download-detailed-header">
-        <div className="download-item-title">
+        <div
+          className={`download-item-title ${viewMode === 'compact' ? 'collapsible' : ''}`}
+          onClick={viewMode === 'compact' ? () => onToggleExpand?.(download.id) : undefined}
+          title={viewMode === 'compact' ? 'Collapse' : undefined}
+        >
+          {viewMode === 'compact' && (
+            <span className="download-expand-chevron expanded"><Icon name="chevron-down" size={14} /></span>
+          )}
           <span className="download-item-name">{download.name}</span>
           <StatusBadge status={status} />
         </div>
@@ -568,7 +602,16 @@ const DownloadsPage: React.FC<DownloadsPageProps> = ({
   }>>([]);
 
   // UI State
-  const [viewMode, setViewMode] = useState<ViewMode>('detailed');
+  const [viewMode, setViewMode] = useState<ViewMode>('compact');
+  // Per-row accordion: which compact rows are expanded to full detail.
+  const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
+  const handleToggleExpand = useCallback((id: string) => {
+    setExpandedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  }, []);
   // Use external filter mode from props
   const filterMode = externalFilterMode;
   const [sortMode, setSortMode] = useState<SortMode>('added');
@@ -1547,6 +1590,8 @@ const DownloadsPage: React.FC<DownloadsPageProps> = ({
                   download={download}
                   stats={stats.get(download.id)}
                   viewMode={viewMode}
+                  expanded={expandedIds.has(download.id)}
+                  onToggleExpand={handleToggleExpand}
                   isSelected={selectedIds.has(download.id)}
                   onSelect={handleSelectItem}
                   onContextMenu={handleContextMenu}

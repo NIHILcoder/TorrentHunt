@@ -776,6 +776,25 @@
   transform: translateY(-1px);
 }
 
+/* Status accent stripe — instant scannability by state */
+.download-item::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 3px;
+  background: transparent;
+  transition: background var(--transition-fast);
+  z-index: 1;
+}
+.download-st-downloading::before { background: var(--color-accent, #3b82f6); }
+.download-st-completed::before,
+.download-st-seeding::before { background: #22c55e; }
+.download-st-paused::before { background: #f59e0b; }
+.download-st-error::before { background: #f87171; }
+.download-st-queued::before { background: var(--color-text-tertiary); }
+
 .download-item-name {
   font-weight: var(--font-weight-semibold);
   color: var(--color-text-primary);
@@ -790,12 +809,17 @@
   display: flex;
   align-items: center;
   gap: var(--space-2);
-  opacity: 0;
+  opacity: 0.85;
   transition: opacity var(--transition-fast);
 }
 
 .download-item:hover .download-item-actions {
   opacity: 1;
+}
+
+/* No hover on touch — keep actions fully visible there. */
+@media (hover: none) {
+  .download-item-actions { opacity: 1; }
 }
 
 .remove-confirm {
@@ -856,7 +880,22 @@
   align-items: center;
   gap: var(--space-3);
   min-width: 0;
+  cursor: pointer;
 }
+
+/* Accordion expand/collapse chevron */
+.download-expand-chevron {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  color: var(--color-text-tertiary);
+  transition: transform var(--transition-fast), color var(--transition-fast);
+}
+.download-expand-chevron.expanded { transform: rotate(180deg); }
+.download-compact-main:hover .download-expand-chevron { color: var(--color-text-primary); }
+.download-item-title.collapsible { cursor: pointer; display: flex; align-items: center; gap: var(--space-2); }
+.download-item-title.collapsible:hover .download-expand-chevron { color: var(--color-text-primary); }
 
 .download-compact-info {
   flex: 1;
@@ -887,7 +926,7 @@
 }
 
 .download-compact-progress {
-  width: 80px;
+  width: 140px;
   flex-shrink: 0;
 }
 
@@ -929,10 +968,10 @@
 
 /* === Detailed View === */
 .download-item-detailed {
-  padding: var(--space-4);
+  padding: var(--space-3);
   display: flex;
   flex-direction: column;
-  gap: var(--space-3);
+  gap: var(--space-2);
 }
 
 .download-detailed-header {
@@ -968,16 +1007,9 @@
 .download-detailed-progress {
   display: flex;
   align-items: center;
-  gap: var(--space-4);
-  padding: var(--space-3);
-  background: var(--color-bg-tertiary);
-  border-radius: var(--radius-lg);
-  transition: all 0.3s ease;
-}
-
-.download-detailed-progress:hover {
-  background: var(--color-bg-hover);
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+  gap: var(--space-3);
+  padding: 0;
+  background: transparent;
 }
 
 .download-detailed-progress .progress-bar {
@@ -985,25 +1017,12 @@
 }
 
 .progress-text-large {
-  font-size: var(--font-size-2xl);
-  font-weight: var(--font-weight-bold);
-  color: var(--color-accent-primary);
-  min-width: 70px;
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-text-secondary);
+  min-width: 44px;
   text-align: right;
-  text-shadow: 0 2px 4px rgba(88, 166, 255, 0.2);
-  animation: progressPulse 2s ease-in-out infinite;
-}
-
-@keyframes progressPulse {
-
-  0%,
-  100% {
-    transform: scale(1);
-  }
-
-  50% {
-    transform: scale(1.05);
-  }
+  font-variant-numeric: tabular-nums;
 }
 
 .download-error-message {
@@ -1039,57 +1058,39 @@
   }
 }
 
-/* Stats Grid - Enhanced Layout */
+/* Stats - compact inline pills */
 .download-detailed-stats {
-  padding: var(--space-3);
-  background: var(--color-bg-tertiary);
-  border-radius: var(--radius-md);
-  border: 1px solid var(--color-border-default);
-  transition: border-color var(--transition-fast);
-}
-
-.download-detailed-stats:hover {
-  border-color: var(--color-border-strong);
+  padding: 0;
+  background: transparent;
+  border: none;
 }
 
 .stats-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  display: flex;
+  flex-wrap: wrap;
   gap: var(--space-2);
 }
 
 .stat-item {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-  padding: var(--space-2);
-  background: var(--color-bg-elevated);
+  display: inline-flex;
+  align-items: baseline;
+  gap: 6px;
+  padding: 4px 10px;
+  background: var(--color-bg-tertiary);
   border: 1px solid var(--color-border-subtle);
-  border-radius: var(--radius-sm);
-  transition: all var(--transition-fast);
+  border-radius: var(--radius-full, 999px);
+  transition: border-color var(--transition-fast);
 }
 
-.stat-item:hover {
-  background: var(--color-bg-hover);
-  border-color: var(--color-border-default);
-}
+.stat-item:hover { border-color: var(--color-border-default); }
 
-.stat-item>svg {
-  color: var(--color-accent-primary);
-  opacity: 0.7;
-  flex-shrink: 0;
-}
-
-.stat-item:hover>svg {
-  opacity: 1;
-}
+.stat-item > svg { display: none; } /* labels are enough; drop icons for density */
 
 .stat-content {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-1);
+  display: inline-flex;
+  align-items: baseline;
+  gap: 6px;
   min-width: 0;
-  flex: 1;
 }
 
 .stat-label {
@@ -1102,27 +1103,24 @@
 }
 
 .stat-value {
-  font-size: var(--font-size-sm);
+  font-size: var(--font-size-xs);
   font-weight: var(--font-weight-semibold);
   color: var(--color-text-primary);
   white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  font-variant-numeric: tabular-nums;
 }
 
 .stat-path {
-  grid-column: 1 / -1;
-  margin-top: var(--space-2);
-  padding: var(--space-2);
-  padding-top: var(--space-2);
-  border-top: 1px solid var(--color-border-subtle);
+  width: 100%;
+  margin-top: var(--space-1);
+  padding: 4px 10px;
   display: flex;
   align-items: center;
   gap: var(--space-2);
   font-size: var(--font-size-xs);
-  color: var(--color-text-secondary);
-  background: var(--color-bg-elevated);
-  border-radius: var(--radius-sm);
+  color: var(--color-text-tertiary);
+  background: var(--color-bg-tertiary);
+  border-radius: var(--radius-md);
   transition: all var(--transition-fast);
 }
 

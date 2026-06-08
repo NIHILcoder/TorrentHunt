@@ -4,6 +4,22 @@ All notable changes to TorrentHunt are documented here.
 This project follows [Keep a Changelog](https://keepachangelog.com/) and
 [Semantic Versioning](https://semver.org/).
 
+## [1.7.1-beta] - 2026-06-08
+
+### Changed
+- **Downloads: expand one torrent at a time (accordion).** Click a torrent (or its
+  chevron) to expand just that row to full details; the rest stay compact. The
+  default view is now compact instead of everything expanded at once.
+- **Downloads: tighter, cleaner list.** The expanded card dropped the oversized
+  percentage and boxy stat cells for compact inline stat pills with less padding;
+  each row now has a status-colored accent stripe (downloading/seeding/paused/
+  error), the row actions are visible (not hidden until hover), and the inline
+  progress bar is wider.
+
+### Fixed
+- **Cast panel QR no longer gets clipped** on shorter windows (the panel now
+  floats with its own scroll).
+
 ## [1.7.0-beta] - 2026-06-07
 
 ### Added
@@ -313,6 +329,7 @@ This project follows [Keep a Changelog](https://keepachangelog.com/) and
 - Real encryption / anonymity options, VPN kill-switch, disk-space guard,
   and torrent health indicators.
 
+[1.7.1-beta]: https://github.com/NIHILcoder/TorrentHunt/releases/tag/v1.7.1-beta
 [1.7.0-beta]: https://github.com/NIHILcoder/TorrentHunt/releases/tag/v1.7.0-beta
 [1.6.3-beta]: https://github.com/NIHILcoder/TorrentHunt/releases/tag/v1.6.3-beta
 [1.6.2-beta]: https://github.com/NIHILcoder/TorrentHunt/releases/tag/v1.6.2-beta
