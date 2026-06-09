@@ -10,6 +10,7 @@ import { canPause, canResume } from '../../shared/state-machine';
 import {
   Button,
   Icon,
+  IconName,
   Input,
   ProgressBar,
   StatusBadge,
@@ -74,6 +75,27 @@ const formatDate = (dateInput: string | Date): string => {
 type ViewMode = 'compact' | 'detailed';
 type FilterMode = 'all' | 'downloading' | 'completed' | 'paused' | 'error';
 type SortMode = 'name' | 'progress' | 'speed' | 'added';
+
+// Pick a content-type icon from the file extension, falling back to the
+// torrent's category, then a generic folder (multi-file torrents have no ext).
+const TYPE_BY_EXT: Record<string, IconName> = {
+  mkv: 'film', mp4: 'film', avi: 'film', mov: 'film', webm: 'film', m4v: 'film', wmv: 'film', flv: 'film', mpg: 'film', mpeg: 'film', ts: 'film', m2ts: 'film',
+  mp3: 'music', flac: 'music', wav: 'music', m4a: 'music', aac: 'music', ogg: 'music', opus: 'music', wma: 'music',
+  zip: 'package', rar: 'package', '7z': 'package', tar: 'package', gz: 'package', bz2: 'package', xz: 'package',
+  iso: 'hard-drive', img: 'hard-drive', bin: 'hard-drive', cue: 'hard-drive', nrg: 'hard-drive', mdf: 'hard-drive',
+  exe: 'cpu', msi: 'cpu', apk: 'cpu', dmg: 'cpu', deb: 'cpu', rpm: 'cpu', pkg: 'cpu', appimage: 'cpu',
+  jpg: 'image', jpeg: 'image', png: 'image', gif: 'image', webp: 'image', bmp: 'image', svg: 'image',
+  pdf: 'file-text', doc: 'file-text', docx: 'file-text', txt: 'file-text', epub: 'file-text', mobi: 'file-text',
+};
+const TYPE_BY_CATEGORY: Record<string, IconName> = {
+  movies: 'film', games: 'gamepad-2', software: 'cpu', music: 'music', other: 'folder',
+};
+function getTypeIcon(download: Download): IconName {
+  const ext = download.name.includes('.') ? download.name.split('.').pop()!.toLowerCase() : '';
+  if (ext && TYPE_BY_EXT[ext]) return TYPE_BY_EXT[ext];
+  if (download.category && TYPE_BY_CATEGORY[download.category]) return TYPE_BY_CATEGORY[download.category];
+  return 'folder';
+}
 
 interface DownloadItemProps {
   download: Download;
@@ -164,6 +186,7 @@ const DownloadItem: React.FC<DownloadItemProps> = ({
           <span className={`download-expand-chevron ${expanded ? 'expanded' : ''}`}>
             <Icon name="chevron-down" size={14} />
           </span>
+          <span className="download-type-icon"><Icon name={getTypeIcon(download)} size={15} /></span>
           <StatusBadge status={status} />
           <div className="download-compact-info">
             <span className="download-item-name truncate">{download.name}</span>
@@ -333,6 +356,7 @@ const DownloadItem: React.FC<DownloadItemProps> = ({
           {viewMode === 'compact' && (
             <span className="download-expand-chevron expanded"><Icon name="chevron-down" size={14} /></span>
           )}
+          <span className="download-type-icon"><Icon name={getTypeIcon(download)} size={16} /></span>
           <span className="download-item-name">{download.name}</span>
           <StatusBadge status={status} />
         </div>
@@ -1542,47 +1566,6 @@ const DownloadsPage: React.FC<DownloadsPageProps> = ({
           />
         ) : (
           <>
-            {/* Sortable Column Headers - Detailed View Only */}
-            {viewMode === 'detailed' && (
-              <div className="downloads-header">
-                <button
-                  className={`sortable-header ${sortMode === 'name' ? 'active' : ''}`}
-                  onClick={() => handleHeaderSort('name')}
-                >
-                  <span>Name</span>
-                  {sortMode === 'name' && (
-                    <Icon name={sortDirection === 'asc' ? 'arrow-up' : 'arrow-down'} size={14} />
-                  )}
-                </button>
-                <button
-                  className={`sortable-header ${sortMode === 'progress' ? 'active' : ''}`}
-                  onClick={() => handleHeaderSort('progress')}
-                >
-                  <span>Progress</span>
-                  {sortMode === 'progress' && (
-                    <Icon name={sortDirection === 'asc' ? 'arrow-up' : 'arrow-down'} size={14} />
-                  )}
-                </button>
-                <button
-                  className={`sortable-header ${sortMode === 'speed' ? 'active' : ''}`}
-                  onClick={() => handleHeaderSort('speed')}
-                >
-                  <span>Speed</span>
-                  {sortMode === 'speed' && (
-                    <Icon name={sortDirection === 'asc' ? 'arrow-up' : 'arrow-down'} size={14} />
-                  )}
-                </button>
-                <button
-                  className={`sortable-header ${sortMode === 'added' ? 'active' : ''}`}
-                  onClick={() => handleHeaderSort('added')}
-                >
-                  <span>Added</span>
-                  {sortMode === 'added' && (
-                    <Icon name={sortDirection === 'asc' ? 'arrow-up' : 'arrow-down'} size={14} />
-                  )}
-                </button>
-              </div>
-            )}
             <div className={`downloads-list downloads-list-${viewMode}`}>
               {sortedDownloads.map((download) => (
                 <DownloadItem

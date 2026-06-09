@@ -897,6 +897,21 @@
 .download-item-title.collapsible { cursor: pointer; display: flex; align-items: center; gap: var(--space-2); }
 .download-item-title.collapsible:hover .download-expand-chevron { color: var(--color-text-primary); }
 
+/* Content-type icon tile (film/game/music/archive/disc/app/…) */
+.download-type-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: var(--radius-md);
+  background: var(--color-bg-tertiary);
+  color: var(--color-text-secondary);
+  flex-shrink: 0;
+}
+.download-item-detailed .download-type-icon { width: 30px; height: 30px; }
+.download-item:hover .download-type-icon { color: var(--color-text-primary); }
+
 .download-compact-info {
   flex: 1;
   min-width: 0;

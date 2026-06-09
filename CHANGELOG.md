@@ -4,6 +4,17 @@ All notable changes to TorrentHunt are documented here.
 This project follows [Keep a Changelog](https://keepachangelog.com/) and
 [Semantic Versioning](https://semver.org/).
 
+## [1.7.3-beta] - 2026-06-08
+
+### Changed
+- **Downloads: content-type icons.** Each row now shows an icon for its kind —
+  film, game, music, archive, disc image, app, picture or document (from the file
+  extension, falling back to the torrent's category) — so the list is scannable at
+  a glance.
+- **Removed the duplicate sort header.** The sortable column row (Name/Progress/
+  Speed/Added) duplicated the always-visible "Sort by" bar, so it's gone; sorting
+  now lives in one place and works in both compact and expanded views.
+
 ## [1.7.2-beta] - 2026-06-08
 
 ### Fixed
@@ -342,6 +353,7 @@ This project follows [Keep a Changelog](https://keepachangelog.com/) and
 - Real encryption / anonymity options, VPN kill-switch, disk-space guard,
   and torrent health indicators.
 
+[1.7.3-beta]: https://github.com/NIHILcoder/TorrentHunt/releases/tag/v1.7.3-beta
 [1.7.2-beta]: https://github.com/NIHILcoder/TorrentHunt/releases/tag/v1.7.2-beta
 [1.7.1-beta]: https://github.com/NIHILcoder/TorrentHunt/releases/tag/v1.7.1-beta
 [1.7.0-beta]: https://github.com/NIHILcoder/TorrentHunt/releases/tag/v1.7.0-beta
