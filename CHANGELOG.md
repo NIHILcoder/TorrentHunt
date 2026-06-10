@@ -4,6 +4,15 @@ All notable changes to TorrentHunt are documented here.
 This project follows [Keep a Changelog](https://keepachangelog.com/) and
 [Semantic Versioning](https://semver.org/).
 
+## [1.8.5-beta] - 2026-06-10
+
+### Added
+- **Peers tab.** The torrent controls window now has a **Peers** tab showing who
+  you're actually connected to, updated live: each peer's address, client
+  (qBittorrent, µTorrent, Transmission, WebTorrent…), connection type, how much
+  of the torrent they have, and the current up/down speed with them. Handy for
+  seeing whether a torrent is healthy and where your bandwidth is going.
+
 ## [1.8.4-beta] - 2026-06-10
 
 ### Added
