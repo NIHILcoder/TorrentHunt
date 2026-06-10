@@ -477,6 +477,15 @@ async function initializeApp(): Promise<void> {
     logger.error('App', 'Failed to init disk guard', { error: e });
   }
 
+  // Forward the listening port via UPnP so peers can connect inbound (no-op if
+  // disabled in settings or the router has no UPnP). Best-effort; never blocks.
+  try {
+    const { restartPortForwardingFromConfig } = await import('./utils/port-forwarding');
+    await restartPortForwardingFromConfig(() => torrentManager.getListeningPort());
+  } catch (e) {
+    logger.error('App', 'Failed to init port forwarding', { error: e });
+  }
+
   // Initialize the auto-updater (no-op in dev; respects the autoUpdate setting)
   try {
     if (mainWindow) {
@@ -706,6 +715,12 @@ async function cleanup(): Promise<void> {
   try {
     const { stopDiskGuard } = await import('./utils/disk-guard');
     stopDiskGuard();
+  } catch { /* ignore */ }
+
+  // Remove the UPnP port mapping and stop renewing it
+  try {
+    const { stopPortForwarding } = await import('./utils/port-forwarding');
+    await stopPortForwarding();
   } catch { /* ignore */ }
 
   // Destroy tray

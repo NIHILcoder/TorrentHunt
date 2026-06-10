@@ -188,6 +188,7 @@ export interface AppSettings {
   maxConnections: number;
   portMin: number;
   portMax: number;
+  portForwarding: boolean;         // Forward the listening port via UPnP (default true)
   // Proxy settings
   proxyEnabled: boolean;
   proxyType: 'http' | 'https' | 'socks5';
@@ -244,6 +245,17 @@ export interface VPNDetectionResult {
     localIP?: string;
     vpnProvider?: string;
   };
+}
+
+/** UPnP port-forwarding status surfaced in Advanced settings. */
+export type PortForwardState = 'disabled' | 'mapping' | 'mapped' | 'unsupported' | 'failed';
+export interface PortForwardStatus {
+  state: PortForwardState;
+  port: number | null;
+  method: 'upnp' | null;
+  externalIp?: string;
+  error?: string;
+  updatedAt: number;
 }
 
 /** One-call privacy snapshot for the dashboard (VPN + geo/ISP of public IP). */
@@ -581,6 +593,7 @@ export interface IpcApi {
   clearAllData: () => Promise<{ success: boolean }>;
   openLogsFolder: () => Promise<{ ok: boolean }>;
   clearLogs: () => Promise<{ removed: number }>;
+  getPortForwardStatus: () => Promise<PortForwardStatus>;
 
   // App events
   onOpenTorrent: (callback: (torrentUri: string) => void) => () => void;

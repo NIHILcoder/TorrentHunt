@@ -110,6 +110,9 @@ export class TorrentManager {
   private maxActiveDownloads = 3;
   private maxDownKbps = 0;
   private maxUpKbps = 0;
+  // The TCP port the engine listens on for incoming peers (from settings.portMin;
+  // 0 = OS-chosen). Used by the UPnP port-forwarding service.
+  private configuredPort = 0;
   private defaultSeedRatioLimit = 0;
   private defaultSeedTimeLimitMinutes = 0;
   
@@ -171,12 +174,13 @@ export class TorrentManager {
     //
     // dht / maxConns / torrentPort / download+uploadLimit come from Settings →
     // Advanced. (PEX can't be toggled in WebTorrent; LSD isn't implemented.)
+    this.configuredPort = settings.portMin > 0 ? settings.portMin : 0;
     this.client = new WebTorrent({
       peerId: this.generateEphemeralPeerId(),
       utp: false,
       dht: settings.enableDHT !== false,
       maxConns: settings.maxConnections > 0 ? settings.maxConnections : 100,
-      torrentPort: settings.portMin > 0 ? settings.portMin : 0,
+      torrentPort: this.configuredPort,
       // -1 = unlimited (0 would mean "0 bytes/sec" and stall all traffic)
       downloadLimit: this.maxDownKbps > 0 ? this.maxDownKbps * 1024 : -1,
       uploadLimit: this.maxUpKbps > 0 ? this.maxUpKbps * 1024 : -1,
@@ -1661,6 +1665,16 @@ export class TorrentManager {
 
   /** Bundled ffmpeg path (or null). Exposed for the LAN cast server. */
   get ffmpegBinary(): string | null { return this.ffmpegPath; }
+
+  /**
+   * The TCP port the engine listens on for incoming peers, for UPnP forwarding.
+   * Prefers the live value WebTorrent resolves once its TCP pool is listening;
+   * falls back to the configured fixed port (Settings → Advanced).
+   */
+  getListeningPort(): number {
+    const live = Number((this.client as any)?.torrentPort) || 0;
+    return live > 0 ? live : this.configuredPort;
+  }
 
   /**
    * Resolve on-disk info for a file so the LAN "cast to device" server can serve

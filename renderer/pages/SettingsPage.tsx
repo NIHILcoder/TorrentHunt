@@ -5,7 +5,7 @@
  */
 
 import React, { useState, useEffect } from 'react';
-import { AppSettings, SchedulerConfig, ScheduleEntry } from '../../shared/types';
+import { AppSettings, SchedulerConfig, ScheduleEntry, PortForwardStatus } from '../../shared/types';
 import {
   Button,
   Icon,
@@ -69,6 +69,8 @@ const SettingsPage: React.FC = () => {
   const [enableDHT, setEnableDHT] = useState(true);
   const [maxConnections, setMaxConnections] = useState(100);
   const [portMin, setPortMin] = useState(6881);
+  const [portForwarding, setPortForwarding] = useState(true);
+  const [pfStatus, setPfStatus] = useState<PortForwardStatus | null>(null);
 
   // Watch folder settings
   const [watchFolderEnabled, setWatchFolderEnabled] = useState(false);
@@ -182,6 +184,18 @@ const SettingsPage: React.FC = () => {
     return () => off();
   }, []);
 
+  // Poll UPnP port-forwarding status while the Advanced tab is open.
+  useEffect(() => {
+    if (activeCategory !== 'advanced') return;
+    let alive = true;
+    const tick = () => {
+      window.api.getPortForwardStatus().then((s) => { if (alive) setPfStatus(s); }).catch(() => {});
+    };
+    tick();
+    const iv = setInterval(tick, 3000);
+    return () => { alive = false; clearInterval(iv); };
+  }, [activeCategory]);
+
   // Track unsaved changes across ALL persisted fields (not just a handful),
   // so the Save bar appears whenever anything actually changed.
   useEffect(() => {
@@ -241,6 +255,7 @@ const SettingsPage: React.FC = () => {
       setEnableDHT(s.enableDHT ?? true);
       setMaxConnections(s.maxConnections ?? 100);
       setPortMin(s.portMin ?? 6881);
+      setPortForwarding(s.portForwarding ?? true);
 
       // Watch folder
       setWatchFolderEnabled(s.watchFolderEnabled ?? false);
@@ -913,6 +928,20 @@ const SettingsPage: React.FC = () => {
               onChange={(e) => setPortMin(parseInt(e.target.value) || 6881)}
             />
           )}
+          {renderSettingItem(
+            t('settings.portForward'),
+            t('settings.portForward.desc'),
+            renderToggle(portForwarding, () => applyToggle(!portForwarding, setPortForwarding, { portForwarding: !portForwarding }))
+          )}
+          {portForwarding && (
+            <div className="setting-item">
+              <div className="setting-info">
+                <div className="setting-label">{t('settings.portForward.status')}</div>
+                <p className="setting-description">{t('settings.portForward.statusDesc')}</p>
+              </div>
+              <div className="setting-control">{renderPfStatus()}</div>
+            </div>
+          )}
         </div>
 
         <div className="settings-notice-compact">
@@ -920,6 +949,29 @@ const SettingsPage: React.FC = () => {
           <span>{t('settings.advanced.restartNote')}</span>
         </div>
       </>
+    );
+  }
+
+  // Coloured status pill for UPnP port forwarding.
+  function renderPfStatus() {
+    const st = pfStatus?.state ?? 'mapping';
+    const portTxt = pfStatus?.port ? ` (${pfStatus.port})` : '';
+    const map: Record<string, { cls: string; icon: 'check-circle' | 'alert-triangle' | 'x-circle' | 'loader'; key: string }> = {
+      mapped:      { cls: 'on',  icon: 'check-circle',   key: 'settings.pf.mapped' },
+      mapping:     { cls: 'off', icon: 'loader',         key: 'settings.pf.mapping' },
+      unsupported: { cls: 'off', icon: 'alert-triangle', key: 'settings.pf.unsupported' },
+      failed:      { cls: 'off', icon: 'x-circle',       key: 'settings.pf.failed' },
+      disabled:    { cls: 'off', icon: 'x-circle',       key: 'settings.pf.disabled' },
+    };
+    const m = map[st] ?? map.mapping;
+    const tk = t as (k: string) => string; // m.key is built at runtime
+    return (
+      <span
+        className={`privacy-status ${m.cls}`}
+        title={pfStatus?.error || (pfStatus?.externalIp ? `${t('settings.pf.externalIp')}: ${pfStatus.externalIp}` : '')}
+      >
+        <Icon name={m.icon} size={14} /> {tk(m.key)}{portTxt}
+      </span>
     );
   }
 

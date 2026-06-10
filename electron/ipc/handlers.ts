@@ -359,6 +359,14 @@ export function setupIpcHandlers(window: BrowserWindow): void {
         await restartGuardFromConfig();
       }
 
+      // Re-apply UPnP port forwarding if the toggle or the listening port changed.
+      // (The port itself only takes effect after a restart, but re-running here
+      // turns forwarding on/off live and re-maps when the user fixes the port.)
+      if (settings.portForwarding !== undefined || settings.portMin !== undefined) {
+        const { restartPortForwardingFromConfig } = await import('../utils/port-forwarding');
+        await restartPortForwardingFromConfig(() => torrentManager.getListeningPort());
+      }
+
       return updated;
     }
   ));
@@ -712,6 +720,14 @@ export function setupIpcHandlers(window: BrowserWindow): void {
     async () => {
       const removed = logger.clearLogs();
       return { removed };
+    }
+  ));
+
+  // Live UPnP port-forwarding status for the Advanced settings panel.
+  ipcMain.handle('network:getPortForwardStatus', wrapHandler('network:getPortForwardStatus',
+    async () => {
+      const { getPortForwarding } = await import('../utils/port-forwarding');
+      return getPortForwarding().getStatus();
     }
   ));
 

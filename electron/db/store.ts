@@ -76,6 +76,7 @@ const store = new Store<StoreSchema>({
       maxConnections: 100,
       portMin: 6881,
       portMax: 6889,
+      portForwarding: true,
       // Proxy
       proxyEnabled: false,
       proxyType: 'http' as const,

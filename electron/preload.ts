@@ -242,6 +242,10 @@ const api: IpcApi = {
     return ipcRenderer.invoke('privacy:clearLogs');
   },
 
+  getPortForwardStatus: () => {
+    return ipcRenderer.invoke('network:getPortForwardStatus');
+  },
+
   // Dialog API
   dialog: {
     showOpenDialog: (options: {
