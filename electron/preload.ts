@@ -366,6 +366,12 @@ const api: IpcApi = {
     return ipcRenderer.invoke('speed:getAlt');
   },
 
+  webRemote: {
+    getInfo: () => ipcRenderer.invoke('webRemote:getInfo'),
+    setEnabled: (enabled: boolean) => ipcRenderer.invoke('webRemote:setEnabled', enabled),
+    regenToken: () => ipcRenderer.invoke('webRemote:regenToken'),
+  },
+
   onVpnDropped: (callback: (info: { paused: number; publicIP?: string }) => void): (() => void) => {
     const handler = (_e: IpcRendererEvent, info: { paused: number; publicIP?: string }) => callback(info);
     ipcRenderer.on('app:vpnDropped', handler);

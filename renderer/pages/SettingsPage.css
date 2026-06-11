@@ -783,3 +783,39 @@
   font-size: 12px;
 }
 
+
+/* === Mobile web remote === */
+.web-remote-panel {
+  display: flex;
+  gap: 18px;
+  align-items: center;
+  padding: 16px;
+  margin-top: 8px;
+  border: 1px solid var(--color-border-default);
+  border-radius: var(--radius-lg, 12px);
+  background: var(--color-bg-secondary);
+  flex-wrap: wrap;
+}
+.web-remote-qr {
+  background: #fff;
+  padding: 10px;
+  border-radius: var(--radius-md, 8px);
+  line-height: 0;
+  flex-shrink: 0;
+}
+.web-remote-info { flex: 1; min-width: 220px; }
+.web-remote-hint { font-size: 13px; color: var(--color-text-secondary); margin: 0 0 8px; }
+.web-remote-url {
+  font-family: var(--font-family-mono, ui-monospace, monospace);
+  font-size: 12px;
+  color: var(--color-text-primary);
+  background: var(--color-bg-tertiary);
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-md, 8px);
+  padding: 8px 10px;
+  word-break: break-all;
+  margin-bottom: 10px;
+}
+.web-remote-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+.web-remote-warn { color: #f59e0b; }
+.web-remote-warn svg { color: #f59e0b; }

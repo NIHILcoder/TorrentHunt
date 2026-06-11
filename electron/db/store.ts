@@ -8,6 +8,7 @@ import { Download, AppSettings, SourceType, Category, SchedulerConfig, UserReput
 import { v4 as uuidv4 } from 'uuid';
 import { app } from 'electron';
 import path from 'path';
+import crypto from 'crypto';
 import { encryptSecret, decryptSecret } from './secrets';
 
 interface StoreSchema {
@@ -94,6 +95,10 @@ const store = new Store<StoreSchema>({
       // Auto-move completed
       autoMoveEnabled: false,
       autoMovePath: '',
+      // Mobile web remote (off by default; token lazily generated)
+      webRemoteEnabled: false,
+      webRemotePort: 8788,
+      webRemoteToken: '',
       // Seeding limits
       defaultSeedRatioLimit: 0,
       defaultSeedTimeLimitMinutes: 0,
@@ -139,6 +144,23 @@ const store = new Store<StoreSchema>({
     windowBounds: null,
   },
 });
+
+// === Web remote token (lazily generated, persisted) ===
+
+export async function getOrCreateWebRemoteToken(): Promise<string> {
+  const s = store.get('settings');
+  if (s.webRemoteToken && s.webRemoteToken.length >= 32) return s.webRemoteToken;
+  const token = crypto.randomBytes(24).toString('hex');
+  store.set('settings', { ...s, webRemoteToken: token });
+  return token;
+}
+
+export async function regenerateWebRemoteToken(): Promise<string> {
+  const s = store.get('settings');
+  const token = crypto.randomBytes(24).toString('hex');
+  store.set('settings', { ...s, webRemoteToken: token });
+  return token;
+}
 
 // === Window bounds ===
 

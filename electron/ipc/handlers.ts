@@ -143,6 +143,46 @@ export function setupIpcHandlers(window: BrowserWindow): void {
     async () => ({ altSpeedEnabled: torrentManager.isAltSpeedEnabled() })
   ));
 
+  // ── Mobile web remote ────────────────────────────────────────────────────
+  const webRemoteInfo = async () => {
+    const settings = await db.getSettings();
+    const { getWebRemoteServer } = await import('../torrent/web-remote');
+    const info = getWebRemoteServer().getInfo();
+    return { enabled: settings.webRemoteEnabled === true, ...info };
+  };
+
+  const applyWebRemote = async () => {
+    const settings = await db.getSettings();
+    const { getWebRemoteServer } = await import('../torrent/web-remote');
+    const srv = getWebRemoteServer();
+    if (settings.webRemoteEnabled) {
+      const token = await db.getOrCreateWebRemoteToken();
+      await srv.start(settings.webRemotePort || 8788, token);
+    } else {
+      await srv.stop();
+    }
+  };
+
+  ipcMain.handle('webRemote:getInfo', wrapHandler('webRemote:getInfo',
+    async () => webRemoteInfo()
+  ));
+
+  ipcMain.handle('webRemote:setEnabled', wrapHandler('webRemote:setEnabled',
+    async (_event, enabled: boolean) => {
+      await db.updateSettings({ webRemoteEnabled: !!enabled } as any);
+      await applyWebRemote();
+      return webRemoteInfo();
+    }
+  ));
+
+  ipcMain.handle('webRemote:regenToken', wrapHandler('webRemote:regenToken',
+    async () => {
+      await db.regenerateWebRemoteToken();
+      await applyWebRemote(); // restart with the new token (revokes old links)
+      return webRemoteInfo();
+    }
+  ));
+
   ipcMain.handle('downloads:retry', wrapHandler('downloads:retry',
     async (_event, id: string) => {
       return await torrentManager.retryDownload(id);

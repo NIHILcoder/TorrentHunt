@@ -506,6 +506,20 @@ async function initializeApp(): Promise<void> {
     logger.error('App', 'Failed to init auto-updater', { error: e });
   }
 
+  // Start the mobile web remote if the user has enabled it (off by default).
+  try {
+    const s = store.get('settings') as any;
+    if (s?.webRemoteEnabled) {
+      const { getWebRemoteServer } = await import('./torrent/web-remote');
+      const { getOrCreateWebRemoteToken } = await import('./db/store');
+      const token = await getOrCreateWebRemoteToken();
+      await getWebRemoteServer().start(s.webRemotePort || 8788, token);
+      logger.info('App', 'Web remote started.');
+    }
+  } catch (e) {
+    logger.error('App', 'Failed to start web remote', { error: e });
+  }
+
   // Apply auto-launch setting (registered as "TorrentHunt", not electron.exe)
   const settings = store.get('settings') as any;
   if (settings?.autoLaunch !== undefined) {
@@ -670,6 +684,14 @@ async function cleanup(): Promise<void> {
     logger.info('App', 'Cast server destroyed.');
   } catch (e) {
     logger.error('App', 'Error destroying cast server', { error: e });
+  }
+
+  try {
+    const { getWebRemoteServer } = await import('./torrent/web-remote');
+    getWebRemoteServer().destroy();
+    logger.info('App', 'Web remote destroyed.');
+  } catch (e) {
+    logger.error('App', 'Error destroying web remote', { error: e });
   }
 
   try {

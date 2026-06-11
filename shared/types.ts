@@ -226,6 +226,10 @@ export interface AppSettings {
   // Move completed downloads to another folder, then keep seeding from there
   autoMoveEnabled: boolean;
   autoMovePath: string;
+  // Mobile web remote (LAN control + streaming from a phone browser)
+  webRemoteEnabled: boolean;
+  webRemotePort: number;
+  webRemoteToken: string;          // random; carried in the pairing URL/QR
   // Default seeding limits
   defaultSeedRatioLimit: number;     // 0 = unlimited
   defaultSeedTimeLimitMinutes: number; // 0 = unlimited
@@ -636,6 +640,12 @@ export interface IpcApi {
   // Alternative ("turbo"/turtle) speed-limit quick toggle
   setAltSpeed: (enabled: boolean) => Promise<{ altSpeedEnabled: boolean }>;
   getAltSpeed: () => Promise<{ altSpeedEnabled: boolean }>;
+  // Mobile web remote
+  webRemote: {
+    getInfo: () => Promise<{ enabled: boolean; running: boolean; url: string | null; port: number }>;
+    setEnabled: (enabled: boolean) => Promise<{ enabled: boolean; running: boolean; url: string | null; port: number }>;
+    regenToken: () => Promise<{ enabled: boolean; running: boolean; url: string | null; port: number }>;
+  };
   onVpnDropped: (callback: (info: { paused: number; publicIP?: string }) => void) => () => void;
   onVpnRestored: (callback: () => void) => () => void;
   onDiskLow: (callback: (info: { paused: number; freeBytes: number; thresholdBytes: number }) => void) => () => void;

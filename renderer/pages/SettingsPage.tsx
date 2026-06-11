@@ -15,6 +15,7 @@ import {
   AppStatistics,
   SettingsSidebar,
   SettingsCategory,
+  QRCode,
 } from '../components';
 import { PrivacySettings } from '../components/PrivacySettings';
 import './SettingsPage.css';
@@ -70,6 +71,9 @@ const SettingsPage: React.FC = () => {
   // Auto-move completed
   const [autoMoveEnabled, setAutoMoveEnabled] = useState(false);
   const [autoMovePath, setAutoMovePath] = useState('');
+  // Mobile web remote
+  const [webRemote, setWebRemote] = useState<{ enabled: boolean; running: boolean; url: string | null; port: number }>({ enabled: false, running: false, url: null, port: 0 });
+  const [remoteCopied, setRemoteCopied] = useState(false);
 
   // Advanced settings (proxy UI removed — WebTorrent has no proxy support;
   // PEX/LSD toggles removed — not switchable/implemented in WebTorrent)
@@ -151,6 +155,7 @@ const SettingsPage: React.FC = () => {
     window.api.getAutoLaunch().then(setAutoLaunch).catch(console.error);
     window.api.isDefaultClient().then(setIsDefaultClient).catch(console.error);
     window.api.getAppVersion().then(setAppVersion).catch(console.error);
+    window.api.webRemote.getInfo().then(setWebRemote).catch(console.error);
   }, []);
 
   useEffect(() => {
@@ -960,6 +965,51 @@ const SettingsPage: React.FC = () => {
           <div className="settings-notice-compact">
             <Icon name="info" size={14} />
             <span>{t('settings.shareTurn.note')}</span>
+          </div>
+        </div>
+
+        <div className="settings-divider" />
+
+        {/* Mobile web remote */}
+        <div className="settings-group">
+          <h3 className="settings-group-title">{t('settings.grp.webRemote')}</h3>
+          {renderSettingItem(
+            t('settings.webRemote'),
+            t('settings.webRemote.desc'),
+            renderToggle(webRemote.enabled, async () => {
+              const info = await window.api.webRemote.setEnabled(!webRemote.enabled);
+              setWebRemote(info);
+            })
+          )}
+
+          {webRemote.enabled && webRemote.url && (
+            <div className="web-remote-panel">
+              <div className="web-remote-qr"><QRCode data={webRemote.url} size={168} /></div>
+              <div className="web-remote-info">
+                <p className="web-remote-hint">{t('settings.webRemote.scan')}</p>
+                <div className="web-remote-url">{webRemote.url}</div>
+                <div className="web-remote-actions">
+                  <Button variant="secondary" size="sm" icon={<Icon name={remoteCopied ? 'check' : 'copy'} size={14} />}
+                    onClick={async () => { try { await navigator.clipboard.writeText(webRemote.url!); setRemoteCopied(true); setTimeout(() => setRemoteCopied(false), 1500); } catch { /* ignore */ } }}>
+                    {t('settings.webRemote.copy')}
+                  </Button>
+                  <Button variant="ghost" size="sm" icon={<Icon name="refresh-cw" size={14} />}
+                    onClick={async () => { const info = await window.api.webRemote.regenToken(); setWebRemote(info); }}>
+                    {t('settings.webRemote.regen')}
+                  </Button>
+                </div>
+              </div>
+            </div>
+          )}
+          {webRemote.enabled && !webRemote.url && (
+            <div className="settings-notice-compact">
+              <Icon name="alert-triangle" size={14} />
+              <span>{t('settings.webRemote.noLan')}</span>
+            </div>
+          )}
+          <div className="settings-notice-compact web-remote-warn">
+            <Icon name="alert-triangle" size={14} />
+            <span>{t('settings.webRemote.warn')}</span>
           </div>
         </div>
       </>
