@@ -1345,20 +1345,56 @@ const SettingsPage: React.FC = () => {
         </div>
 
         <div className="about-section">
-          <div className="about-app">
-            <div className="about-icon"><Icon name="download" size={28} /></div>
-            <div className="about-info-text">
+          {/* Animated hero */}
+          <div className="about-hero">
+            <div className="about-hero-glow" />
+            <div className="about-logo">
+              <div className="about-logo-ring" />
+              <div className="about-logo-tile"><Icon name="download" size={30} /></div>
+            </div>
+            <div className="about-hero-text">
               <h2 className="about-app-name">TorrentHunt</h2>
-              <p className="about-version">{t('settings.version')} {appVersion || '—'}</p>
-              <p className="about-description">
-                {t('settings.appDesc')}
-              </p>
+              <div className="about-badges">
+                <span className="about-pill about-pill--ver">v{appVersion || '—'}</span>
+                {/(alpha|beta|rc)/i.test(appVersion) && (
+                  <span className="about-pill about-pill--beta">beta</span>
+                )}
+                <span className="about-pill about-pill--soft">Electron · React · WebTorrent</span>
+                <span className="about-pill about-pill--soft">MIT</span>
+              </div>
+              <p className="about-description">{t('settings.appDesc')}</p>
+
+              <div className="about-actions">
+                {updateReady ? (
+                  <Button variant="primary" onClick={() => window.api.quitAndInstallUpdate()}
+                    icon={<Icon name="refresh-cw" size={15} />}>
+                    {t('settings.restartInstall')}
+                  </Button>
+                ) : (
+                  <Button variant="primary" onClick={() => window.api.checkForUpdates()}
+                    icon={<Icon name="refresh-cw" size={15} />}>
+                    {t('settings.checkUpdates')}
+                  </Button>
+                )}
+                {!isDefaultClient && (
+                  <Button variant="secondary" onClick={async () => {
+                    const r = await window.api.setDefaultClient();
+                    if (r?.success) setIsDefaultClient(true);
+                  }} icon={<Icon name="check-circle" size={15} />}>
+                    {t('settings.makeDefault')}
+                  </Button>
+                )}
+                {isDefaultClient && (
+                  <span className="about-default-ok"><Icon name="check-circle" size={15} /> {t('settings.isDefault')}</span>
+                )}
+                <a className="about-link-btn" href="https://github.com/NIHILcoder/TorrentHunt" target="_blank" rel="noreferrer">
+                  <Icon name="external-link" size={15} /> GitHub
+                </a>
+              </div>
             </div>
           </div>
 
-          <div className="settings-divider" />
-
-          <div className="settings-group">
+          <div className="settings-group about-stats-group">
             <h3 className="settings-group-title">{t('settings.grp.statistics')}</h3>
             <AppStatistics
               totalDownloads={stats.totalDownloads}

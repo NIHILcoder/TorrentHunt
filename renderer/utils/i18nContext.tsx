@@ -390,6 +390,8 @@ const dictionary = {
     'settings.import': 'Import',
     'settings.appDesc': 'A desktop torrent client focused on legal open-source software distribution.',
     'settings.version': 'Version',
+    'settings.makeDefault': 'Make default app',
+    'settings.isDefault': 'Default torrent app',
 
     // Settings — actions & messages
     'settings.cancel': 'Cancel',
@@ -1000,6 +1002,8 @@ const dictionary = {
     'settings.import': 'Импорт',
     'settings.appDesc': 'Десктопный торрент-клиент, ориентированный на легальное распространение open-source ПО.',
     'settings.version': 'Версия',
+    'settings.makeDefault': 'Сделать клиентом по умолчанию',
+    'settings.isDefault': 'Клиент по умолчанию',
 
     // Settings — действия и сообщения
     'settings.cancel': 'Отмена',
