@@ -8,12 +8,16 @@
  */
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
+import Hls from 'hls.js';
 import toast from 'react-hot-toast';
 import { RoomState, RoomSummary, RoomProfile, RoomFile } from '../../shared/types';
 import { Button, Icon, EmptyState, Identicon, QRCode } from '../components';
+import { classifyMediaKind } from '../../shared/media';
 import { formatBytes, formatSpeed } from '../utils/format-helpers';
 import { useTranslation } from '../utils/i18nContext';
 import './RoomsPage.css';
+
+const isPlayable = (name: string): boolean => classifyMediaKind(name) !== 'other';
 
 function membersWithFile(room: RoomState, fileId: string): number {
   return room.members.filter((m) => m.have.includes(fileId)).length;
@@ -27,6 +31,9 @@ const RoomsPage: React.FC = () => {
   const [room, setRoom] = useState<RoomState | null>(null);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
+
+  // In-app room player (watch a downloaded shared file, optionally in sync)
+  const [watch, setWatch] = useState<{ file: RoomFile } | null>(null);
 
   // Lightweight inline dialogs
   const [dialog, setDialog] = useState<null | 'create' | 'join' | 'profile' | 'invite'>(null);
@@ -208,6 +215,7 @@ const RoomsPage: React.FC = () => {
                 onInvite={() => setDialog('invite')}
                 onLeave={() => handleLeave(room.roomId)}
                 onCopyCode={() => copy(room.code, t('rooms.codeCopied'))}
+                onWatch={(file) => setWatch({ file })}
                 busy={busy}
               />
             )}
@@ -298,6 +306,11 @@ const RoomsPage: React.FC = () => {
           </div>
         </div>
       )}
+
+      {/* In-app player (watch a downloaded shared file, optionally in sync) */}
+      {watch && room && (
+        <RoomPlayer roomId={room.roomId} file={watch.file} onClose={() => setWatch(null)} />
+      )}
     </div>
   );
 };
@@ -310,10 +323,11 @@ interface DetailProps {
   onInvite: () => void;
   onLeave: () => void;
   onCopyCode: () => void;
+  onWatch: (file: RoomFile) => void;
   busy: boolean;
 }
 
-const RoomDetail: React.FC<DetailProps> = ({ room, onAddFiles, onOpenFolder, onInvite, onLeave, onCopyCode, busy }) => {
+const RoomDetail: React.FC<DetailProps> = ({ room, onAddFiles, onOpenFolder, onInvite, onLeave, onCopyCode, onWatch, busy }) => {
   const { t } = useTranslation();
   const totalMembers = room.members.length;
   return (
@@ -363,7 +377,7 @@ const RoomDetail: React.FC<DetailProps> = ({ room, onAddFiles, onOpenFolder, onI
         ) : (
           <div className="room-files">
             {room.files.map((f) => (
-              <RoomFileRow key={f.fileId} file={f} room={room} />
+              <RoomFileRow key={f.fileId} file={f} room={room} onWatch={onWatch} />
             ))}
           </div>
         )}
@@ -372,13 +386,14 @@ const RoomDetail: React.FC<DetailProps> = ({ room, onAddFiles, onOpenFolder, onI
   );
 };
 
-const RoomFileRow: React.FC<{ file: RoomFile; room: RoomState }> = ({ file, room }) => {
+const RoomFileRow: React.FC<{ file: RoomFile; room: RoomState; onWatch: (file: RoomFile) => void }> = ({ file, room, onWatch }) => {
   const { t } = useTranslation();
   const tr = room.transfers[file.fileId];
   const owner = room.members.find((m) => m.memberId === file.addedBy);
   const haveCount = membersWithFile(room, file.fileId);
   const downloading = tr && tr.status === 'downloading';
   const haveLocally = tr?.haveLocally;
+  const canWatch = haveLocally && isPlayable(file.name);
 
   return (
     <div className="room-file">
@@ -406,6 +421,15 @@ const RoomFileRow: React.FC<{ file: RoomFile; room: RoomState }> = ({ file, room
           </div>
         )}
       </div>
+      {canWatch && (
+        <button
+          className="room-file-open room-file-watch"
+          onClick={() => onWatch(file)}
+          title={t('rooms.watchHint')}
+        >
+          <Icon name="play" size={14} /> {t('rooms.watch')}
+        </button>
+      )}
       {haveLocally && (
         <button
           className="room-file-open"
@@ -423,6 +447,114 @@ const RoomFileRow: React.FC<{ file: RoomFile; room: RoomState }> = ({ file, room
         ) : (
           <span className="room-status queued" title={t('rooms.queued')}><Icon name="download" size={16} /></span>
         )}
+      </div>
+    </div>
+  );
+};
+
+// In-app player for a downloaded room file. Direct-playable files stream from
+// the cast server's /direct (seekable); others go through hls.js against the
+// on-the-fly HLS transcode. "Watch together" keeps playback in sync across the
+// room by broadcasting play/pause/seek over the encrypted gossip channel.
+const RoomPlayer: React.FC<{ roomId: string; file: RoomFile; onClose: () => void }> = ({ roomId, file, onClose }) => {
+  const { t } = useTranslation();
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const hlsRef = useRef<Hls | null>(null);
+  const applyingRemote = useRef(false); // suppress echo while applying a remote action
+  const togetherRef = useRef(false);
+  const [together, setTogether] = useState(false);
+  const [controller, setController] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+  togetherRef.current = together;
+
+  // Load the media (direct or HLS).
+  useEffect(() => {
+    let alive = true;
+    window.api.rooms.watchFile(roomId, file.fileId).then((info) => {
+      if (!alive) return;
+      const v = videoRef.current;
+      if (!v) return;
+      if (info.direct) {
+        v.src = info.directUrl;
+      } else if (Hls.isSupported()) {
+        const hls = new Hls({ maxBufferLength: 30 });
+        hlsRef.current = hls;
+        hls.loadSource(info.hlsUrl);
+        hls.attachMedia(v);
+        hls.on(Hls.Events.ERROR, (_e, data) => { if (data.fatal) setError(t('rooms.playError')); });
+      } else {
+        v.src = info.hlsUrl;
+      }
+      v.play().catch(() => {});
+      setLoading(false);
+    }).catch((e) => { if (alive) { setError(String(e instanceof Error ? e.message : e)); setLoading(false); } });
+    return () => {
+      alive = false;
+      if (hlsRef.current) { try { hlsRef.current.destroy(); } catch { /* ignore */ } hlsRef.current = null; }
+    };
+  }, [roomId, file.fileId, t]);
+
+  // Broadcast local play/pause/seek to peers when "together" is on.
+  useEffect(() => {
+    const v = videoRef.current;
+    if (!v) return;
+    const send = (action: string) => {
+      if (!togetherRef.current || applyingRemote.current) return;
+      window.api.rooms.broadcastSync(roomId, { fileId: file.fileId, action, position: v.currentTime, rate: v.playbackRate }).catch(() => {});
+    };
+    const onPlay = () => send('play');
+    const onPause = () => send('pause');
+    const onSeeked = () => send('seek');
+    v.addEventListener('play', onPlay);
+    v.addEventListener('pause', onPause);
+    v.addEventListener('seeked', onSeeked);
+    return () => { v.removeEventListener('play', onPlay); v.removeEventListener('pause', onPause); v.removeEventListener('seeked', onSeeked); };
+  }, [roomId, file.fileId]);
+
+  // Apply remote sync actions, correcting drift only when it exceeds ~1.5s.
+  useEffect(() => {
+    const off = window.api.onRoomSync((msg) => {
+      if (msg.roomId !== roomId || msg.fileId !== file.fileId || !togetherRef.current) return;
+      const v = videoRef.current;
+      if (!v) return;
+      setController(msg.name);
+      const expected = msg.position + (msg.action === 'play' ? Math.max(0, (Date.now() - msg.at) / 1000) : 0);
+      applyingRemote.current = true;
+      try {
+        if (msg.action === 'pause') { v.pause(); if (Math.abs(v.currentTime - msg.position) > 0.5) v.currentTime = msg.position; }
+        else if (msg.action === 'seek') { v.currentTime = msg.position; }
+        else if (msg.action === 'play') { if (Math.abs(v.currentTime - expected) > 1.5) v.currentTime = expected; v.play().catch(() => {}); }
+      } finally {
+        setTimeout(() => { applyingRemote.current = false; }, 250);
+      }
+    });
+    return off;
+  }, [roomId, file.fileId]);
+
+  const toggleTogether = () => {
+    const next = !together;
+    setTogether(next);
+    const v = videoRef.current;
+    if (next && v) {
+      window.api.rooms.broadcastSync(roomId, { fileId: file.fileId, action: v.paused ? 'pause' : 'play', position: v.currentTime, rate: v.playbackRate }).catch(() => {});
+    }
+  };
+
+  return (
+    <div className="room-player-backdrop" onClick={onClose}>
+      <div className="room-player" onClick={(e) => e.stopPropagation()}>
+        <div className="room-player-top">
+          <span className="room-player-name" title={file.name}>{file.name}</span>
+          <button className={`room-player-sync ${together ? 'on' : ''}`} onClick={toggleTogether} title={t('rooms.together.hint')}>
+            <Icon name="users" size={14} /> {together ? t('rooms.together.on') : t('rooms.together.off')}
+          </button>
+          <button className="room-player-close" onClick={onClose}><Icon name="x" size={18} /></button>
+        </div>
+        <video ref={videoRef} className="room-player-video" controls autoPlay playsInline />
+        {loading && !error && <div className="room-player-msg">{t('common.loading')}</div>}
+        {error && <div className="room-player-msg err">{error}</div>}
+        {together && controller && <div className="room-player-controller">{t('rooms.together.synced')}: {controller}</div>}
       </div>
     </div>
   );

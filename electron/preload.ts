@@ -496,12 +496,22 @@ const api: IpcApi = {
     pickAndAddFiles: (roomId: string): Promise<RoomState | null> => ipcRenderer.invoke('rooms:pickAndAddFiles', roomId),
     openFolder: (roomId: string): Promise<void> => ipcRenderer.invoke('rooms:openFolder', roomId),
     openFile: (roomId: string, fileId: string): Promise<void> => ipcRenderer.invoke('rooms:openFile', roomId, fileId),
+    watchFile: (roomId: string, fileId: string): Promise<{ directUrl: string; hlsUrl: string; playerUrl: string; direct: boolean; kind: string; name: string }> =>
+      ipcRenderer.invoke('rooms:watchFile', roomId, fileId),
+    broadcastSync: (roomId: string, payload: { fileId: string; action: string; position: number; rate?: number }): Promise<{ ok: boolean }> =>
+      ipcRenderer.invoke('rooms:broadcastSync', roomId, payload),
   },
 
   onRoomUpdate: (callback: (state: RoomState) => void): (() => void) => {
     const handler = (_event: IpcRendererEvent, state: RoomState) => callback(state);
     ipcRenderer.on('rooms:update', handler);
     return () => { ipcRenderer.removeListener('rooms:update', handler); };
+  },
+
+  onRoomSync: (callback: (msg: { roomId: string; fileId: string; action: string; position: number; rate: number; at: number; memberId: string; name: string }) => void): (() => void) => {
+    const handler = (_event: IpcRendererEvent, msg: any) => callback(msg);
+    ipcRenderer.on('rooms:sync', handler);
+    return () => { ipcRenderer.removeListener('rooms:sync', handler); };
   },
 
   // Priority 2: IP Blocklist

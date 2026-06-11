@@ -328,3 +328,56 @@
 }
 
 .page-loading { padding: var(--space-10); text-align: center; color: var(--color-text-tertiary); font-size: 14px; }
+
+/* === In-app room player === */
+.room-file-watch { color: var(--color-accent-primary, #fff); }
+.room-player-backdrop {
+  position: fixed; inset: 0; z-index: 1000;
+  background: rgba(0,0,0,0.75);
+  display: flex; align-items: center; justify-content: center;
+  padding: 24px;
+}
+.room-player {
+  width: min(960px, 96vw);
+  background: #0b0e17;
+  border: 1px solid var(--color-border-default, #23232a);
+  border-radius: 14px;
+  overflow: hidden;
+  display: flex; flex-direction: column;
+}
+.room-player-top {
+  display: flex; align-items: center; gap: 10px;
+  padding: 10px 12px;
+  background: #0a0a0b;
+  border-bottom: 1px solid var(--color-border-default, #23232a);
+}
+.room-player-name {
+  flex: 1; min-width: 0;
+  font-size: 13px; font-weight: 600; color: var(--color-text-primary, #e7e7ea);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.room-player-sync {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 6px 12px; border-radius: 999px;
+  border: 1px solid var(--color-border-default, #2a2a33);
+  background: var(--color-bg-tertiary, #15151c);
+  color: var(--color-text-secondary, #9a9aa2);
+  font-size: 12px; font-weight: 600; cursor: pointer;
+}
+.room-player-sync.on {
+  background: #22c55e; border-color: #22c55e; color: #04210f;
+}
+.room-player-close {
+  width: 30px; height: 30px; display: grid; place-items: center;
+  border-radius: 8px; border: 0; cursor: pointer;
+  background: transparent; color: var(--color-text-secondary, #9a9aa2);
+}
+.room-player-close:hover { background: var(--color-bg-tertiary, #1c1c24); color: var(--color-text-primary, #e7e7ea); }
+.room-player-video { width: 100%; max-height: 72vh; background: #000; outline: none; display: block; }
+.room-player-msg { padding: 12px; font-size: 13px; color: #9a9aa2; text-align: center; }
+.room-player-msg.err { color: #f87171; }
+.room-player-controller {
+  padding: 8px 12px; font-size: 12px; color: #22c55e;
+  border-top: 1px solid var(--color-border-default, #23232a);
+  display: flex; align-items: center; gap: 6px;
+}

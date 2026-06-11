@@ -58,6 +58,13 @@ const dictionary = {
     'rooms.inviteDesc': 'Share this code (or QR) with friends. Anyone with it can join.',
     'rooms.openFile': 'Open',
     'rooms.openFileHint': 'Open the file. Sharing of it stops so the file unlocks (others keep their copy).',
+    'rooms.watch': 'Watch',
+    'rooms.watchHint': 'Play this file in the app (keeps seeding). Turn on "Watch together" to stay in sync with the room.',
+    'rooms.playError': 'Could not play this file on this device.',
+    'rooms.together.off': 'Watch together',
+    'rooms.together.on': 'In sync',
+    'rooms.together.hint': 'Sync play / pause / seek with everyone in the room.',
+    'rooms.together.synced': 'Following',
 
     // Downloads
     'filter.all': 'All',
@@ -692,6 +699,13 @@ const dictionary = {
     'rooms.inviteDesc': 'Поделитесь этим кодом (или QR) с друзьями. Любой, у кого он есть, может войти.',
     'rooms.openFile': 'Открыть',
     'rooms.openFileHint': 'Открыть файл. Раздача файла остановится, чтобы он разблокировался (у других копия останется).',
+    'rooms.watch': 'Смотреть',
+    'rooms.watchHint': 'Воспроизвести файл в приложении (раздача продолжается). Включите «Смотреть вместе» для синхронизации с комнатой.',
+    'rooms.playError': 'Не удалось воспроизвести этот файл на этом устройстве.',
+    'rooms.together.off': 'Смотреть вместе',
+    'rooms.together.on': 'Синхронно',
+    'rooms.together.hint': 'Синхронизировать воспроизведение / паузу / перемотку со всеми в комнате.',
+    'rooms.together.synced': 'Следуем за',
     
     // Downloads
     'filter.all': 'Все',

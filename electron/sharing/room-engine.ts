@@ -56,7 +56,9 @@ type Msg =
   | { t: 'hello'; memberId: string; name: string; avatarSeed: string; have: string[]; files: RoomFile[] }
   | { t: 'add'; file: RoomFile }
   | { t: 'have'; memberId: string; fileId: string }
-  | { t: 'ping'; memberId: string; name: string; avatarSeed: string; have: string[] };
+  | { t: 'ping'; memberId: string; name: string; avatarSeed: string; have: string[] }
+  // Watch-together: relayed verbatim to peers; the renderers keep playback in sync.
+  | { t: 'sync'; fileId: string; action: 'play' | 'pause' | 'seek' | 'state'; position: number; rate: number; at: number; memberId: string; name: string };
 
 interface Wire { id: number; peer: any; memberId?: string; }
 
@@ -216,6 +218,17 @@ function onMessage(room: Room, wire: Wire, raw: any): void {
       const m = room.members.get(msg.memberId);
       if (m && !m.have.includes(msg.fileId)) { m.have.push(msg.fileId); m.lastSeen = Date.now(); }
       pushState(room);
+      break;
+    }
+    case 'sync': {
+      // Relay watch-together control to the main process → renderer player.
+      try {
+        ipcRenderer.send('room-sync', {
+          roomId: room.roomId, fileId: msg.fileId, action: msg.action,
+          position: msg.position, rate: msg.rate, at: msg.at,
+          memberId: msg.memberId, name: msg.name,
+        });
+      } catch { /* ignore */ }
       break;
     }
   }
@@ -481,6 +494,16 @@ ipcRenderer.on('room-cmd', async (_e, msg: any) => {
     else if (type === 'leave') { leaveRoom(msg.roomId); data = { ok: true }; }
     else if (type === 'profile') { updateProfile(msg.payload || {}); data = { ok: true }; }
     else if (type === 'releaseFile') { releaseFile(msg.roomId, msg.fileId); data = { ok: true }; }
+    else if (type === 'sync') {
+      const r = rooms.get(msg.roomId);
+      const p = msg.payload || {};
+      if (r) broadcast(r, {
+        t: 'sync', fileId: String(p.fileId || ''), action: p.action || 'state',
+        position: Number(p.position) || 0, rate: Number(p.rate) || 1, at: Date.now(),
+        memberId: r.self.memberId, name: r.self.name || 'You',
+      });
+      data = { ok: true };
+    }
     else if (type === 'snapshot') { const r = rooms.get(msg.roomId); data = r ? buildState(r) : null; }
     else throw new Error('Unknown room command: ' + type);
     ipcRenderer.send('room-res', { reqId, ok: true, data });

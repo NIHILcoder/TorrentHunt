@@ -24,9 +24,11 @@
 import http from 'http';
 import os from 'os';
 import fs from 'fs';
+import path from 'path';
 import crypto from 'crypto';
 import { spawn, ChildProcess } from 'child_process';
 import { logger } from '../utils';
+import { classifyMediaKind, isDirectlyPlayable } from '../../shared/media';
 
 const log = logger.child('CastServer');
 
@@ -54,6 +56,9 @@ export class CastServer {
   private port = 0;
   private token = '';
   private published = new Set<string>(); // `${id}/${fileIndex}`
+  // On-disk files published directly (e.g. room files) — resolved before the
+  // manager so they don't need to be a managed torrent.
+  private diskPublished = new Map<string, FileInfo>(); // `${id}/0` → info
   private durations = new Map<string, number>(); // diskPath → seconds
   private active = new Set<ChildProcess>();
   private hlsLib: Buffer | null = null;          // cached hls.min.js
@@ -100,7 +105,7 @@ export class CastServer {
    * Returns null when there's no LAN address to reach this machine on.
    */
   async publish(id: string, fileIndex: number): Promise<{ url: string; lan: string; port: number } | null> {
-    const info = this.resolveFile(id, fileIndex);
+    const info = this.resolve(id, fileIndex);
     if (!info) throw new Error('File not available for casting');
     if (info.kind === 'other') throw new Error('This file is not a playable media file');
     if (!info.direct && !this.getFfmpeg()) throw new Error('Casting this format needs the bundled ffmpeg, which is unavailable');
@@ -114,13 +119,48 @@ export class CastServer {
 
   unpublish(id: string, fileIndex: number): void { this.published.delete(`${id}/${fileIndex}`); }
 
+  /** Resolve a published file — disk-published entries first, then manager torrents. */
+  private resolve(id: string, fileIndex: number): FileInfo | null {
+    const disk = this.diskPublished.get(`${id}/${fileIndex}`);
+    if (disk) return disk;
+    return this.resolveFile(id, fileIndex);
+  }
+
+  /**
+   * Publish a plain on-disk file (e.g. a downloaded room file) and return ready
+   * media URLs for an in-app player. Loopback host: the in-app player loads it
+   * locally (the server still binds 0.0.0.0, so 127.0.0.1 works). Reuses the
+   * same direct/HLS/transcode machinery as torrent casting.
+   */
+  async publishDiskFile(absPath: string): Promise<{ directUrl: string; hlsUrl: string; playerUrl: string; direct: boolean; kind: 'video' | 'audio' | 'other'; name: string }> {
+    const stat = fs.statSync(absPath); // throws ENOENT if missing
+    const name = path.basename(absPath);
+    const kind = classifyMediaKind(name);
+    if (kind === 'other') throw new Error('This file is not a playable media file');
+    const direct = isDirectlyPlayable(name);
+    if (!direct && !this.getFfmpeg()) throw new Error('Playing this format needs the bundled ffmpeg, which is unavailable');
+    await this.ensureServer();
+    const id = 'disk_' + crypto.createHash('sha1').update(absPath).digest('hex').slice(0, 16);
+    this.diskPublished.set(`${id}/0`, { name, length: stat.size, diskPath: absPath, complete: true, kind, direct });
+    this.published.add(`${id}/0`);
+    const base = `http://127.0.0.1:${this.port}`;
+    const p = `/${encodeURIComponent(id)}/0`;
+    const k = `?k=${this.token}`;
+    return {
+      directUrl: `${base}/direct${p}${k}`,
+      hlsUrl: `${base}/hls${p}/master.m3u8${k}`,
+      playerUrl: `${base}/play${p}${k}`,
+      direct, kind, name,
+    };
+  }
+
   /**
    * Build a direct media URL + content type for a TV (Chromecast/DLNA), which
    * fetches the URL itself. Browser-playable files go via /direct (seekable);
    * everything else via HLS, which Chromecast plays natively.
    */
   async tvMedia(id: string, fileIndex: number): Promise<{ url: string; contentType: string; title: string }> {
-    const info = this.resolveFile(id, fileIndex);
+    const info = this.resolve(id, fileIndex);
     if (!info) throw new Error('File not available for casting');
     if (info.kind === 'other') throw new Error('This file is not a playable media file');
     if (!info.direct && !this.getFfmpeg()) throw new Error('Casting this format needs the bundled ffmpeg, which is unavailable');
@@ -152,7 +192,7 @@ export class CastServer {
       const id = decodeURIComponent(parts[1] || '');
       const fileIndex = Number(parts[2]);
       if (!this.published.has(`${id}/${fileIndex}`)) { res.writeHead(404); res.end('not published'); return; }
-      const info = this.resolveFile(id, fileIndex);
+      const info = this.resolve(id, fileIndex);
       if (!info) { res.writeHead(404); res.end('gone'); return; }
 
       if (route === 'play') return void this.servePlayer(res, info, id, fileIndex);

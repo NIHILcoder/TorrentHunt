@@ -64,6 +64,12 @@ export class RoomManager {
       }
     });
     ipcMain.on('room-log', (_e, m: any) => log.info('Engine', { msg: String(m) }));
+    // Watch-together: forward a peer's playback control to the renderer player.
+    ipcMain.on('room-sync', (_e, payload: any) => {
+      if (this.mainWindow && !this.mainWindow.isDestroyed()) {
+        this.mainWindow.webContents.send('rooms:sync', payload);
+      }
+    });
   }
 
   private failAll(message: string): void {
@@ -247,6 +253,28 @@ export class RoomManager {
     try { await this.call('releaseFile', { roomId, fileId }, 8000); } catch { /* engine may be down */ }
     if (folder && file) {
       try { await shell.openPath(path.join(folder, file.name)); } catch { /* ignore */ }
+    }
+  }
+
+  /**
+   * Resolve a downloaded room file on disk and publish it on the cast server,
+   * returning ready media URLs for the in-app player.
+   */
+  async watchFile(roomId: string, fileId: string): Promise<{ directUrl: string; hlsUrl: string; playerUrl: string; direct: boolean; kind: string; name: string }> {
+    const state = this.cache.get(roomId);
+    const file = state?.files.find((f) => f.fileId === fileId);
+    const folder = this.folderOf(roomId);
+    if (!file || !folder) throw new Error('File not available in this room');
+    const abs = path.join(folder, file.name);
+    if (!fs.existsSync(abs)) throw new Error('This file is not fully downloaded yet');
+    const { getCastServer } = await import('../torrent/cast-server');
+    return getCastServer().publishDiskFile(abs);
+  }
+
+  /** Watch-together: broadcast a local playback action to the room's peers. */
+  broadcastSync(roomId: string, payload: { fileId: string; action: string; position: number; rate?: number }): void {
+    if (this.win && !this.win.isDestroyed() && this.ready) {
+      this.win.webContents.send('room-cmd', { type: 'sync', reqId: ++this.reqSeq, roomId, payload });
     }
   }
 

@@ -386,6 +386,17 @@ export function setupIpcHandlers(window: BrowserWindow): void {
     async (_event, roomId: string, fileId: string) => roomManager.openFile(roomId, fileId)
   ));
 
+  ipcMain.handle('rooms:watchFile', wrapHandler('rooms:watchFile',
+    async (_event, roomId: string, fileId: string) => roomManager.watchFile(roomId, fileId)
+  ));
+
+  ipcMain.handle('rooms:broadcastSync', wrapHandler('rooms:broadcastSync',
+    async (_event, roomId: string, payload: { fileId: string; action: string; position: number; rate?: number }) => {
+      roomManager.broadcastSync(roomId, payload);
+      return { ok: true };
+    }
+  ));
+
   ipcMain.handle('downloads:getTorrentInfo', wrapHandler('downloads:getTorrentInfo',
     async (_event, params: { torrentPath?: string; magnetUri?: string }) => {
       return torrentManager.getTorrentInfo(params);
