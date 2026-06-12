@@ -219,13 +219,28 @@ export class SearchService {
   private extractXMLTag(xml: string, tag: string): string | null {
     const cdataRegex = new RegExp(`<${tag}[^>]*><!\\[CDATA\\[([\\s\\S]*?)\\]\\]><\\/${tag}>`, 'i');
     const cdataMatch = xml.match(cdataRegex);
+    // CDATA content is literal — don't entity-decode it.
     if (cdataMatch) return cdataMatch[1].trim();
 
     const normalRegex = new RegExp(`<${tag}[^>]*>([^<]*)<\\/${tag}>`, 'i');
     const normalMatch = xml.match(normalRegex);
-    if (normalMatch) return normalMatch[1].trim();
+    // Regular text content is entity-encoded ("&amp;", "&#39;", …) — decode it
+    // so titles and links aren't shown/queried with raw entities.
+    if (normalMatch) return this.decodeEntities(normalMatch[1].trim());
 
     return null;
+  }
+
+  /** Decode the common XML/HTML entities found in feed titles and links. */
+  private decodeEntities(s: string): string {
+    return s
+      .replace(/&lt;/g, '<')
+      .replace(/&gt;/g, '>')
+      .replace(/&quot;/g, '"')
+      .replace(/&apos;/g, "'")
+      .replace(/&#(\d+);/g, (_, n) => String.fromCharCode(parseInt(n, 10)))
+      .replace(/&#x([0-9a-fA-F]+);/g, (_, n) => String.fromCharCode(parseInt(n, 16)))
+      .replace(/&amp;/g, '&'); // last, so "&amp;lt;" doesn't become "<"
   }
 
   private async fetchJSON(url: string): Promise<any> {

@@ -121,6 +121,13 @@ interface ManagedTorrent {
   download: Download;
   infoHash: string | null;
   selectedFiles?: number[];
+  // WebTorrent's torrent.downloaded/uploaded count only the CURRENT session and
+  // reset to 0 every time the torrent instance is recreated (pause/resume/
+  // recheck/auto-move/restart). To keep lifetime totals — and a stable share
+  // ratio — we snapshot the persisted totals when a live instance is attached
+  // and report baseline + live session bytes.
+  sessionBaseDownloaded?: number;
+  sessionBaseUploaded?: number;
   // Lazily-created per-torrent HTTP server used for in-app streaming. Bound to
   // the specific torrent instance it was created for (torrents are recreated on
   // pause/resume), so we can tell when it has gone stale.
@@ -295,8 +302,9 @@ export class TorrentManager {
 
     log.info(`Restoring ${activeDownloads.length} downloads from database`);
 
+    // Populate the managed map synchronously first so getDownloads()/getStats()
+    // see every torrent immediately.
     for (const download of activeDownloads) {
-      // Store in managed map, restoring persisted selectedFiles
       this.managedTorrents.set(download.id, {
         id: download.id,
         torrent: null,
@@ -304,12 +312,20 @@ export class TorrentManager {
         infoHash: null,
         selectedFiles: download.selectedFiles,
       });
+    }
 
-      // Re-add torrents that were active
+    // Re-add the active torrents in parallel. Doing this serially meant a single
+    // magnet with no peers blocked the whole restore for up to METADATA_TIMEOUT_MS
+    // (and N dead magnets blocked it N×). restoreTorrent never rejects (it logs
+    // and transitions to 'error' on its own), so allSettled bounds the wait to
+    // the single slowest torrent instead of their sum.
+    const restorePromises: Promise<void>[] = [];
+    for (const download of activeDownloads) {
       if (['downloading', 'seeding', 'queued'].includes(download.status)) {
-        await this.restoreTorrent(download);
+        restorePromises.push(this.restoreTorrent(download));
       }
     }
+    await Promise.allSettled(restorePromises);
 
     // Start stats broadcasting
     this.startStatsBroadcast();
@@ -738,26 +754,10 @@ export class TorrentManager {
         }
       }
 
-      // 4. Check by torrent file name to prevent downloading the same file twice
-      if (params.name && params.name !== 'Loading...') {
-        for (const [existingId, managed] of this.managedTorrents.entries()) {
-          if (managed.download.status === 'removed') continue;
-
-          // Compare normalized names (case-insensitive, trimmed)
-          const normalizedNewName = params.name.toLowerCase().trim();
-          const normalizedExistingName = managed.download.name.toLowerCase().trim();
-
-          if (normalizedNewName === normalizedExistingName) {
-            const errorMessage = `Torrent with this name is already in downloads: "${managed.download.name}"`;
-            log.warn('Duplicate torrent rejected (by name)', {
-              existingId,
-              existingName: managed.download.name,
-              newName: params.name
-            });
-            throw new TorrentError(errorMessage, 'DUPLICATE');
-          }
-        }
-      }
+      // Note: we intentionally do NOT reject by display name. Two genuinely
+      // different torrents can share a name (different releases/repacks), and
+      // the infoHash checks above already catch true duplicates of the same
+      // content — which is the only thing that would actually collide on disk.
 
       const settings = await db.getSettings();
       const savePath = params.savePath || settings.defaultDownloadDir;
@@ -922,6 +922,10 @@ export class TorrentManager {
           this.client.removeListener('error', fail);
           try {
             managed.torrent = torrent;
+            // Snapshot lifetime totals (a re-seeded entry may already have an
+            // upload history we must not reset to 0).
+            managed.sessionBaseDownloaded = managed.download.downloadedBytes || 0;
+            managed.sessionBaseUploaded = managed.download.uploadedBytes || 0;
             const infoHash = torrent.infoHash;
 
             const duplicateId = this.getDuplicateByInfoHash(infoHash, id);
@@ -1014,6 +1018,10 @@ export class TorrentManager {
       const torrent = this.client.add(torrentInput, addOptions);
 
       managed.torrent = torrent;
+      // Snapshot lifetime totals so this session's bytes add onto them rather
+      // than overwriting them (see ManagedTorrent.sessionBase* docs).
+      managed.sessionBaseDownloaded = managed.download.downloadedBytes || 0;
+      managed.sessionBaseUploaded = managed.download.uploadedBytes || 0;
 
       // Guard against magnets that never find peers: without metadata 'ready'
       // never fires and this promise would hang forever (blocking the IPC add
@@ -2136,11 +2144,16 @@ export class TorrentManager {
       if (download.status === 'removed') continue;
       
       if (torrent) {
+        // Lifetime totals = persisted baseline (from before this instance was
+        // attached) + this session's bytes. Prevents the ratio from resetting
+        // on pause/resume/recheck/restart.
+        const lifetimeDownloaded = (managed.sessionBaseDownloaded || 0) + (torrent.downloaded || 0);
+        const lifetimeUploaded = (managed.sessionBaseUploaded || 0) + (torrent.uploaded || 0);
         stats.push({
           id: download.id,
           progress: torrent.progress,
-          downloadedBytes: torrent.downloaded,
-          uploadedBytes: torrent.uploaded,
+          downloadedBytes: lifetimeDownloaded,
+          uploadedBytes: lifetimeUploaded,
           downSpeedBps: torrent.downloadSpeed,
           upSpeedBps: torrent.uploadSpeed,
           etaSeconds: torrent.timeRemaining > 0 ? Math.floor(torrent.timeRemaining / 1000) : null,
@@ -2153,8 +2166,8 @@ export class TorrentManager {
         // only updates the store copy; without this, checkSeedingLimits would
         // compute the seed ratio from stale (often zero) byte counters.
         download.progress = torrent.progress;
-        download.downloadedBytes = torrent.downloaded;
-        download.uploadedBytes = torrent.uploaded;
+        download.downloadedBytes = lifetimeDownloaded;
+        download.uploadedBytes = lifetimeUploaded;
         download.downSpeedBps = torrent.downloadSpeed;
         download.upSpeedBps = torrent.uploadSpeed;
         download.peers = torrent.numPeers;

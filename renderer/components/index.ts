@@ -36,8 +36,6 @@ export { SpeedPresets } from './SpeedPresets';
 export { NotificationSettings } from './NotificationSettings';
 export { HotkeySettings, defaultHotkeys } from './HotkeySettings';
 export { SystemSettings } from './SystemSettings';
-export { ProxySettings } from './ProxySettings';
-export { AdvancedSettings } from './AdvancedSettings';
 export { SettingsBackup } from './SettingsBackup';
 export { AppStatistics } from './AppStatistics';
 export { SettingsSidebar } from './SettingsSidebar';

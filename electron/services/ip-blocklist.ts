@@ -6,6 +6,7 @@
 
 import https from 'https';
 import http from 'http';
+import zlib from 'zlib';
 import { URL } from 'url';
 import WebTorrent from 'webtorrent';
 import { logger } from '../utils';
@@ -44,11 +45,40 @@ export class IPBlocklistService {
       allRanges.push(...parsed);
     }
 
-    // Sort ranges for binary search
+    // Sort, then merge overlapping/adjacent ranges. Without merging, the binary
+    // search in isBlocked() can miss an IP that falls inside an earlier, wider
+    // range (e.g. ranges (1,100) and (50,60): a lookup of 80 lands on (50,60),
+    // walks right, and never sees that (1,100) also covers it).
     allRanges.sort((a, b) => a.start - b.start);
-    this.ranges = allRanges;
+    this.ranges = this.mergeRanges(allRanges);
 
     log.info(`Loaded ${this.ranges.length} blocked IP ranges from ${enabled.length} blocklists`);
+  }
+
+  /** Coalesce a sorted list of ranges into non-overlapping ranges. */
+  private mergeRanges(sorted: IPRange[]): IPRange[] {
+    const merged: IPRange[] = [];
+    for (const r of sorted) {
+      const last = merged[merged.length - 1];
+      // +1 so touching ranges (…,100) and (101,…) collapse into one.
+      if (last && r.start <= last.end + 1) {
+        if (r.end > last.end) last.end = r.end;
+      } else {
+        merged.push({ ...r });
+      }
+    }
+    return merged;
+  }
+
+  /**
+   * Normalize a peer address to a plain IPv4 string, or null if it isn't one.
+   * Incoming TCP/uTP peers surface as IPv4-mapped IPv6 ("::ffff:1.2.3.4"); the
+   * raw form makes ipToNum() throw, so such peers were never actually filtered.
+   */
+  private normalizeIp(ip: unknown): string | null {
+    if (typeof ip !== 'string' || !ip) return null;
+    const stripped = ip.replace(/^::ffff:/i, '');
+    return /^\d+\.\d+\.\d+\.\d+$/.test(stripped) ? stripped : null;
   }
 
   /**
@@ -116,17 +146,26 @@ export class IPBlocklistService {
     this.clientRef = client;
     this.appliedToClient = true;
 
-    client.on('torrent', (torrent: any) => {
-      torrent.on('wire', (wire: any) => {
-        const peerIp = wire.remoteAddress;
-        if (!peerIp) return;
+    const checkWire = (wire: any): void => {
+      const peerIp = this.normalizeIp(wire?.remoteAddress);
+      if (!peerIp) return;
+      if (this.isBlocked(peerIp)) {
+        log.debug('Blocked peer', { ip: peerIp });
+        try { wire.destroy(); } catch (_) { /* ignore */ }
+      }
+    };
 
-        if (this.isBlocked(peerIp)) {
-          log.debug('Blocked peer', { ip: peerIp });
-          try { wire.destroy(); } catch (_) { /* ignore */ }
-        }
-      });
-    });
+    const hookTorrent = (torrent: any): void => {
+      torrent.on('wire', checkWire);
+      // Peers that connected before we attached (e.g. on restored torrents).
+      for (const w of (torrent.wires || [])) checkWire(w);
+    };
+
+    client.on('torrent', hookTorrent);
+    // The blocklist is applied after startup, so torrents restored during
+    // initialize() already exist and won't fire another 'torrent' event —
+    // hook them (and their live wires) explicitly.
+    for (const t of ((client as any).torrents || [])) hookTorrent(t);
 
     log.info('IP blocklist applied to WebTorrent client');
   }
@@ -203,25 +242,48 @@ export class IPBlocklistService {
   }
 
   private async fetchText(url: string): Promise<string> {
+    return (await this.fetchBuffer(url, 0)).toString('utf8');
+  }
+
+  /**
+   * Fetch a blocklist as a Buffer, following redirects and transparently
+   * decompressing gzip/deflate. Most public lists (iblocklist, etc.) are served
+   * as .gz; the previous string-concatenation reader corrupted that binary data
+   * and parsed zero ranges.
+   */
+  private fetchBuffer(url: string, redirects: number): Promise<Buffer> {
     return new Promise((resolve, reject) => {
+      if (redirects > 5) { reject(new Error('Too many redirects fetching blocklist')); return; }
       const parsed = new URL(url);
       const lib = parsed.protocol === 'https:' ? https : http;
 
       const req = lib.get(url, {
-        headers: { 'User-Agent': 'TorrentHunt/1.3.5 Blocklist' },
+        headers: { 'User-Agent': 'TorrentHunt Blocklist', 'Accept-Encoding': 'gzip, deflate' },
         timeout: 30000,
       }, (res) => {
         if (res.statusCode && res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
-          this.fetchText(res.headers.location).then(resolve).catch(reject);
+          res.resume();
+          this.fetchBuffer(new URL(res.headers.location, url).toString(), redirects + 1).then(resolve).catch(reject);
           return;
         }
         if (res.statusCode && res.statusCode >= 400) {
+          res.resume();
           reject(new Error(`HTTP ${res.statusCode} fetching blocklist`));
           return;
         }
-        let data = '';
-        res.on('data', (chunk: string) => { data += chunk; });
-        res.on('end', () => resolve(data));
+        const chunks: Buffer[] = [];
+        res.on('data', (chunk: Buffer) => chunks.push(chunk));
+        res.on('end', () => {
+          let buf = Buffer.concat(chunks);
+          const enc = String(res.headers['content-encoding'] || '').toLowerCase();
+          try {
+            if (enc.includes('gzip') || /\.gz$/i.test(parsed.pathname)) buf = zlib.gunzipSync(buf);
+            else if (enc.includes('deflate')) buf = zlib.inflateSync(buf);
+          } catch (_) {
+            // Not actually compressed (server lied / plain .gz alias) — use raw bytes.
+          }
+          resolve(buf);
+        });
         res.on('error', reject);
       });
 
