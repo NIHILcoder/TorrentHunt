@@ -95,6 +95,16 @@ export interface RoomFile {
   addedAt: number;
 }
 
+/**
+ * A manifest entry persisted to disk so a room shows — and re-seeds — its files
+ * immediately on restart, before any peer reconnects. Carries the on-disk path
+ * so a file shared from its ORIGINAL location (outside the room folder) can be
+ * re-seeded without the original sharer having to re-add it.
+ */
+export interface PersistedRoomFile extends RoomFile {
+  localPath?: string;
+}
+
 /** A member of a room (including yourself). */
 export interface RoomMember {
   memberId: string;      // stable per-install identity

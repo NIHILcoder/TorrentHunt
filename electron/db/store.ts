@@ -19,7 +19,7 @@
  */
 
 import Store from 'electron-store';
-import { Download, AppSettings, SourceType, Category, SchedulerConfig, UserReputation, ReputationTransaction, PrivacyConfig, RSSFeed, RSSItem, SearchProvider, IPBlocklist, RoomProfile } from '../../shared/types';
+import { Download, AppSettings, SourceType, Category, SchedulerConfig, UserReputation, ReputationTransaction, PrivacyConfig, RSSFeed, RSSItem, SearchProvider, IPBlocklist, RoomProfile, PersistedRoomFile } from '../../shared/types';
 import { v4 as uuidv4 } from 'uuid';
 import { app } from 'electron';
 import path from 'path';
@@ -63,6 +63,7 @@ interface RoomsSchema {
   rooms: Record<string, PersistedRoom>;      // Friend swarms / private rooms (Phase 3)
   roomProfile: RoomProfile | null;           // This install's identity in rooms
   roomTombstones: Record<string, string[]>;  // roomId → deleted fileIds (stop resurrection)
+  roomManifests: Record<string, PersistedRoomFile[]>; // roomId → known files (resume on restart)
 }
 
 interface ReputationSchema {
@@ -200,7 +201,7 @@ const searchStore = new Store<SearchSchema>({
 
 const roomsStore = new Store<RoomsSchema>({
   name: 'rooms',
-  defaults: { rooms: {}, roomProfile: null, roomTombstones: {} },
+  defaults: { rooms: {}, roomProfile: null, roomTombstones: {}, roomManifests: {} },
 });
 
 const reputationStore = new Store<ReputationSchema>({
@@ -265,6 +266,35 @@ export function clearRoomTombstones(roomId: string): void {
   const all = roomsStore.get('roomTombstones') ?? {};
   delete all[roomId];
   roomsStore.set('roomTombstones', all);
+}
+
+// === Room manifest (known files — resume a room's file list/seeding on restart) ===
+
+export function getRoomManifest(roomId: string): PersistedRoomFile[] {
+  return (roomsStore.get('roomManifests') ?? {})[roomId] ?? [];
+}
+
+/** Add or update one file in a room's persisted manifest (keyed by fileId). */
+export function upsertRoomManifestFile(roomId: string, file: PersistedRoomFile): void {
+  if (!file?.fileId) return;
+  const all = roomsStore.get('roomManifests') ?? {};
+  const list = (all[roomId] ?? []).filter((f) => f.fileId !== file.fileId);
+  list.push(file);
+  all[roomId] = list.slice(-1000); // cap
+  roomsStore.set('roomManifests', all);
+}
+
+export function removeRoomManifestFile(roomId: string, fileId: string): void {
+  const all = roomsStore.get('roomManifests') ?? {};
+  if (!all[roomId]) return;
+  all[roomId] = all[roomId].filter((f) => f.fileId !== fileId);
+  roomsStore.set('roomManifests', all);
+}
+
+export function clearRoomManifest(roomId: string): void {
+  const all = roomsStore.get('roomManifests') ?? {};
+  delete all[roomId];
+  roomsStore.set('roomManifests', all);
 }
 
 // === Web remote token (lazily generated, persisted) ===

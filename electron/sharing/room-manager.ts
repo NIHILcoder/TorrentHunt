@@ -74,6 +74,14 @@ export class RoomManager {
     ipcMain.on('room-tomb', (_e, payload: { roomId: string; fileId: string }) => {
       try { if (payload?.roomId && payload?.fileId) db.addRoomTombstone(payload.roomId, payload.fileId); } catch { /* ignore */ }
     });
+    // A file entered/changed in a room's manifest — persist it so the room shows
+    // and re-seeds it immediately on the next launch, before peers reconnect.
+    ipcMain.on('room-manifest-add', (_e, payload: { roomId: string; file: import('../../shared/types').PersistedRoomFile }) => {
+      try { if (payload?.roomId && payload?.file?.fileId) db.upsertRoomManifestFile(payload.roomId, payload.file); } catch { /* ignore */ }
+    });
+    ipcMain.on('room-manifest-del', (_e, payload: { roomId: string; fileId: string }) => {
+      try { if (payload?.roomId && payload?.fileId) db.removeRoomManifestFile(payload.roomId, payload.fileId); } catch { /* ignore */ }
+    });
     // A joiner learned the room's friendly name from a peer (it had only the
     // code) — persist it so the name survives restart and shows in the list even
     // before the room reconnects. Live UI updates ride the normal room-update.
@@ -156,6 +164,7 @@ export class RoomManager {
         useTurn,
         turnServers: TURN_SERVERS,
         tombstones: db.getRoomTombstones(roomId),
+        manifest: db.getRoomManifest(roomId),
       },
     };
   }
@@ -218,6 +227,7 @@ export class RoomManager {
     try { await this.call('leave', { roomId }, 8000); } catch { /* engine may be down */ }
     db.deletePersistedRoom(roomId);
     db.clearRoomTombstones(roomId);
+    db.clearRoomManifest(roomId);
     this.cache.delete(roomId);
     return { ok: true };
   }

@@ -26,7 +26,7 @@ import fs from 'fs';
 import path from 'path';
 import WebTorrent from 'webtorrent';
 import { deriveKey, topicHash, randomPeerId, encrypt, decrypt } from './room-crypto';
-import { RoomFile, RoomMember, RoomState, RoomTransfer } from '../../shared/types';
+import { RoomFile, RoomMember, RoomState, RoomTransfer, PersistedRoomFile } from '../../shared/types';
 
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 const TrackerClient = require('bittorrent-tracker') as any;
@@ -270,6 +270,8 @@ function onMessage(room: Room, wire: Wire, raw: any): void {
  */
 function applyTombstone(room: Room, fileId: string): void {
   room.tombstones.add(fileId);
+  // Drop it from the persisted manifest too so it isn't re-seeded next launch.
+  try { ipcRenderer.send('room-manifest-del', { roomId: room.roomId, fileId }); } catch { /* ignore */ }
   const tr = room.transfers.get(fileId);
   if (client) { const t = client.get(fileId); if (t) { try { client.remove(t); } catch { /* ignore */ } } }
   room.files.delete(fileId);
@@ -301,6 +303,7 @@ function mergeFile(room: Room, file: RoomFile): void {
   if (room.tombstones.has(file.fileId)) return; // deleted — don't let a peer resurrect it
   if (!room.files.has(file.fileId)) {
     room.files.set(file.fileId, file);
+    persistManifest(room, file); // localPath filled in once the download lands
     ensureLocal(room, file);
   }
 }
@@ -308,6 +311,14 @@ function mergeFile(room: Room, file: RoomFile): void {
 function setTransfer(room: Room, fileId: string, patch: Partial<RoomTransfer>): void {
   const prev = room.transfers.get(fileId) || { fileId, progress: 0, status: 'queued' as const, downSpeed: 0, peers: 0, haveLocally: false };
   room.transfers.set(fileId, { ...prev, ...patch, fileId });
+}
+
+/** Persist a manifest entry to the main process so the room resumes its file
+ *  list — and re-seeds — on the next launch. localPath lets us re-seed a file
+ *  shared from its original location (outside the room folder). */
+function persistManifest(room: Room, file: RoomFile, localPath?: string): void {
+  const entry: PersistedRoomFile = { ...file, ...(localPath ? { localPath } : {}) };
+  try { ipcRenderer.send('room-manifest-add', { roomId: room.roomId, file: entry }); } catch { /* ignore */ }
 }
 
 /** Seed a local file the user added, returning a RoomFile manifest entry. */
@@ -351,6 +362,7 @@ function ensureLocal(room: Room, file: RoomFile): void {
   const onDisk = path.join(room.folder, file.name);
   if (fs.existsSync(onDisk)) {
     setTransfer(room, file.fileId, { progress: 1, status: 'seeding', haveLocally: true, localPath: onDisk });
+    persistManifest(room, file, onDisk);
     try {
       c.seed(onDisk, { announce: ROOM_TRACKERS, name: file.name } as any, (t: any) => wireTorrentStats(room, t));
     } catch (e) { log('reseed failed: ' + String(e)); }
@@ -362,7 +374,9 @@ function ensureLocal(room: Room, file: RoomFile): void {
     c.add(file.magnetURI, { path: room.folder, announce: ROOM_TRACKERS } as any, (torrent: any) => {
       wireTorrentStats(room, torrent);
       torrent.on('done', () => {
-        setTransfer(room, file.fileId, { progress: 1, status: 'seeding', downSpeed: 0, haveLocally: true, localPath: path.join(room.folder, file.name) });
+        const landed = path.join(room.folder, file.name);
+        setTransfer(room, file.fileId, { progress: 1, status: 'seeding', downSpeed: 0, haveLocally: true, localPath: landed });
+        persistManifest(room, file, landed); // record where it landed so we re-seed it next launch
         broadcast(room, { t: 'have', memberId: room.self.memberId, fileId: file.fileId });
         pushState(room, true);
       });
@@ -371,6 +385,31 @@ function ensureLocal(room: Room, file: RoomFile): void {
     setTransfer(room, file.fileId, { status: 'error' });
     log('download add failed: ' + String(e));
   }
+}
+
+/**
+ * Resume one persisted manifest file on startup: register it in the manifest,
+ * then re-seed from its known on-disk path if present (covers a file shared from
+ * its ORIGINAL location, outside the room folder). Otherwise fall back to the
+ * normal seed-from-folder / download path.
+ */
+function restoreManifestFile(room: Room, pf: PersistedRoomFile): void {
+  if (room.tombstones.has(pf.fileId)) return;
+  if (room.files.has(pf.fileId)) return;
+  const file: RoomFile = {
+    fileId: pf.fileId, name: pf.name, size: pf.size, infoHash: pf.infoHash,
+    magnetURI: pf.magnetURI, addedBy: pf.addedBy, addedByName: pf.addedByName, addedAt: pf.addedAt,
+  };
+  room.files.set(file.fileId, file);
+  const c = ensureClient(room.iceServers);
+  if (c.get(file.infoHash)) return; // already seeding/adding
+  if (pf.localPath && fs.existsSync(pf.localPath)) {
+    setTransfer(room, file.fileId, { progress: 1, status: 'seeding', haveLocally: true, localPath: pf.localPath });
+    try { c.seed(pf.localPath, { announce: ROOM_TRACKERS, name: file.name } as any, (t: any) => wireTorrentStats(room, t)); }
+    catch (e) { log('manifest reseed failed: ' + String(e)); }
+    return;
+  }
+  ensureLocal(room, file); // not at the known path — seed-from-folder or re-download
 }
 
 function wireTorrentStats(room: Room, torrent: any): void {
@@ -395,7 +434,7 @@ function wireTorrentStats(room: Room, torrent: any): void {
 
 // ── Room lifecycle ───────────────────────────────────────────────────────────
 function startRoom(p: { roomId: string; name: string; code: string; folder: string;
-  self: { memberId: string; name: string; avatarSeed: string }; useTurn: boolean; turnServers?: any[]; tombstones?: string[] }): RoomState {
+  self: { memberId: string; name: string; avatarSeed: string }; useTurn: boolean; turnServers?: any[]; tombstones?: string[]; manifest?: PersistedRoomFile[] }): RoomState {
   let room = rooms.get(p.roomId);
   if (room) return buildState(room);
 
@@ -427,9 +466,17 @@ function startRoom(p: { roomId: string; name: string; code: string; folder: stri
   };
   rooms.set(p.roomId, room);
 
-  // Adopt any files already sitting in the room folder (re-share on restart).
+  // Resume the persisted manifest first so the room shows — and re-seeds — its
+  // files immediately, before any peer reconnects. Covers files shared from
+  // outside the room folder (which the folder scan below would miss).
+  for (const pf of p.manifest || []) restoreManifestFile(room, pf);
+
+  // Adopt any files sitting in the room folder that the manifest didn't already
+  // cover (re-share on restart).
   try {
+    const known = new Set(Array.from(room.files.values()).map((f) => f.name));
     for (const entry of fs.readdirSync(room.folder)) {
+      if (known.has(entry)) continue;
       const full = path.join(room.folder, entry);
       if (fs.statSync(full).isFile()) {
         seedLocal(room, full).then((f) => { mergeFileLocal(room!, f, full); }).catch(() => { /* ignore */ });
@@ -477,6 +524,7 @@ function mergeFileLocal(room: Room, file: RoomFile, localPath?: string): void {
   if (!room.files.has(file.fileId)) {
     room.files.set(file.fileId, file);
     setTransfer(room, file.fileId, { progress: 1, status: 'seeding', haveLocally: true, ...(localPath ? { localPath } : {}) });
+    persistManifest(room, file, localPath);
     broadcast(room, { t: 'add', file });
     pushState(room, true);
   }
