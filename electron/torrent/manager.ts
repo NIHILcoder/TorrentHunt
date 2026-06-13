@@ -321,18 +321,45 @@ export class TorrentManager {
       });
     }
 
-    // Re-add the active torrents in parallel. Doing this serially meant a single
+    // Decide which torrents to bring live now, honouring maxActiveDownloads.
+    // Only 'downloading' counts against the limit (see ACTIVE_STATES); seeding
+    // torrents always resume since they don't occupy a download slot. Without
+    // this cap, EVERY restored torrent was added to WebTorrent at once, so all
+    // of them hash-checked their on-disk data and read/wrote pieces at the same
+    // time — the source of the startup disk thrash and UI lag. Downloads beyond
+    // the limit are re-queued so processQueue() starts them as slots free, just
+    // like a freshly-added download.
+    const toRestore: Download[] = [];
+    let downloadSlots = this.maxActiveDownloads;
+    // Higher priority first so the most important downloads claim the live slots.
+    const restorable = activeDownloads
+      .filter((d) => ['downloading', 'seeding', 'queued'].includes(d.status))
+      .sort((a, b) => (b.priority || 0) - (a.priority || 0));
+
+    for (const download of restorable) {
+      if (download.status === 'seeding') {
+        toRestore.push(download);
+      } else if (download.status === 'downloading') {
+        if (downloadSlots > 0) {
+          toRestore.push(download);
+          downloadSlots--;
+        } else {
+          // Exceeds the active-download limit — defer to the queue rather than
+          // starting it live now and overloading the disk.
+          await this.transitionStatus(download.id, 'queued').catch((err) => {
+            log.warn('Failed to re-queue download during restore', { id: download.id, error: String(err) });
+          });
+        }
+      }
+      // 'queued' downloads are left untouched for processQueue() below.
+    }
+
+    // Re-add the chosen torrents in parallel. Doing this serially meant a single
     // magnet with no peers blocked the whole restore for up to METADATA_TIMEOUT_MS
     // (and N dead magnets blocked it N×). restoreTorrent never rejects (it logs
     // and transitions to 'error' on its own), so allSettled bounds the wait to
     // the single slowest torrent instead of their sum.
-    const restorePromises: Promise<void>[] = [];
-    for (const download of activeDownloads) {
-      if (['downloading', 'seeding', 'queued'].includes(download.status)) {
-        restorePromises.push(this.restoreTorrent(download));
-      }
-    }
-    await Promise.allSettled(restorePromises);
+    await Promise.allSettled(toRestore.map((download) => this.restoreTorrent(download)));
 
     // Start stats broadcasting
     this.startStatsBroadcast();
@@ -1178,6 +1205,9 @@ export class TorrentManager {
           }
           // Auto-move to the completed folder (then keep seeding from there).
           void this.moveCompletedIfNeeded(id);
+          // The download slot this torrent held just freed up (seeding doesn't
+          // count toward maxActiveDownloads) — promote the next queued download.
+          void this.processQueue();
         }
       });
 
