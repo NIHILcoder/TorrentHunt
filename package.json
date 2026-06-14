@@ -1,6 +1,6 @@
 {
   "name": "torrenthunt",
-  "version": "1.9.3-beta",
+  "version": "1.9.4-beta",
   "description": "A modern, agent-built BitTorrent client",
   "main": "dist/electron/electron/main.js",
   "scripts": {
@@ -83,7 +83,7 @@
         "provider": "github",
         "owner": "NIHILcoder",
         "repo": "TorrentHunt",
-        "releaseType": "release"
+        "releaseType": "prerelease"
       }
     ],
     "files": [

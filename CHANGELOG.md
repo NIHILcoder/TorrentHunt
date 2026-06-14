@@ -4,6 +4,32 @@ All notable changes to TorrentHunt are documented here.
 This project follows [Keep a Changelog](https://keepachangelog.com/) and
 [Semantic Versioning](https://semver.org/).
 
+## [1.9.4-beta] - 2026-06-14
+
+A performance fix plus a wave of **experimental** private-room features. The
+rooms work is opt-in and not yet verified across two real machines — treat it as
+a preview.
+
+### Fixed
+- **No more startup disk thrash with several torrents.** On launch every torrent
+  was brought live at once, so they all hash-checked their data simultaneously —
+  heavy disk load and UI lag. Restore now honours your max-active-downloads limit
+  (seeding doesn't count); the rest queue up and start as slots free.
+
+### Added (experimental — private rooms)
+- **Room names sync automatically.** Joining by code now learns the room's real
+  name from peers instead of showing the raw invite code.
+- **Files survive a restart.** A room remembers its shared files and re-seeds them
+  on launch, including files you shared from outside the room folder.
+- **Owner role, activity log, and hiding members.** The creator owns the room;
+  there's an activity feed (joins, shares, removals), and you can locally hide a
+  member so their shares are ignored on your device.
+- **Remove a member (owner only).** Rotates the room's invite code to everyone
+  except the removed member, so they can't rejoin with the old one.
+- **End-to-end encrypted rooms (opt-in).** Turn on encryption when creating a room
+  and file contents are encrypted with a room key before sharing — the swarm only
+  ever carries ciphertext. Uses about twice the disk (encrypted + decrypted copy).
+
 ## [1.9.3-beta] - 2026-06-13
 
 A stability, performance and security release — lots of engine fixes, a major
