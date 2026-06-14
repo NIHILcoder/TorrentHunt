@@ -23,6 +23,26 @@ function membersWithFile(room: RoomState, fileId: string): number {
   return room.members.filter((m) => m.have.includes(fileId)).length;
 }
 
+type RoomsTFn = (key: keyof typeof import('../i18n/en.json')) => string;
+
+/** Human text for one activity-log event (actor name is rendered separately). */
+function eventText(t: RoomsTFn, ev: import('../../shared/types').RoomEvent): string {
+  switch (ev.type) {
+    case 'created': return t('rooms.ev.created');
+    case 'joined': return t('rooms.ev.joined');
+    case 'file-added': return `${t('rooms.ev.fileAdded')} ${ev.fileName || ''}`.trim();
+    case 'file-removed': return `${t('rooms.ev.fileRemoved')} ${ev.fileName || ''}`.trim();
+    case 'kicked': return `${t('rooms.ev.kicked')} ${ev.targetName || ''}`.trim();
+    case 'rekeyed': return t('rooms.ev.rekeyed');
+    default: return ev.type;
+  }
+}
+
+function shortTime(at: number): string {
+  try { return new Date(at).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }); }
+  catch { return ''; }
+}
+
 const RoomsPage: React.FC = () => {
   const { t } = useTranslation();
   const [profile, setProfile] = useState<RoomProfile | null>(null);
@@ -359,10 +379,30 @@ const RoomDetail: React.FC<DetailProps> = ({ room, onAddFiles, onOpenFolder, onI
         <div className="room-section-title">{t('rooms.members')} · {totalMembers}</div>
         <div className="room-members">
           {room.members.map((m) => (
-            <div key={m.memberId} className={`room-member ${m.online ? '' : 'offline'}`} title={m.online ? t('rooms.online') : t('rooms.offline')}>
+            <div key={m.memberId} className={`room-member ${m.online ? '' : 'offline'} ${m.muted ? 'muted' : ''}`} title={m.online ? t('rooms.online') : t('rooms.offline')}>
               <Identicon seed={m.avatarSeed} size={46} online={m.online} ring={m.isSelf} />
-              <span className="room-member-name">{m.isSelf ? (m.name && m.name !== 'You' ? m.name : t('rooms.you')) : m.name}</span>
-              <span className="room-member-have">{m.have.length}/{room.files.length}</span>
+              <span className="room-member-name">
+                {m.role === 'owner' && <Icon name="star" size={11} className="room-member-owner" />}
+                {m.isSelf ? (m.name && m.name !== 'You' ? m.name : t('rooms.you')) : m.name}
+              </span>
+              <span className="room-member-have">
+                {m.muted ? t('rooms.muted') : `${m.have.length}/${room.files.length}`}
+              </span>
+              {!m.isSelf && (
+                <button
+                  className="room-member-mute"
+                  title={m.muted ? t('rooms.unmute') : t('rooms.mute')}
+                  onClick={() => {
+                    if (m.muted) {
+                      window.api.rooms.setMuted(room.roomId, m.memberId, false).catch((e) => toast.error(String(e instanceof Error ? e.message : e)));
+                    } else if (window.confirm(t('rooms.muteConfirm'))) {
+                      window.api.rooms.setMuted(room.roomId, m.memberId, true).catch((e) => toast.error(String(e instanceof Error ? e.message : e)));
+                    }
+                  }}
+                >
+                  <Icon name={m.muted ? 'eye' : 'eye-off'} size={13} />
+                </button>
+              )}
             </div>
           ))}
         </div>
@@ -383,6 +423,24 @@ const RoomDetail: React.FC<DetailProps> = ({ room, onAddFiles, onOpenFolder, onI
           <div className="room-files">
             {room.files.map((f) => (
               <RoomFileRow key={f.fileId} file={f} room={room} onWatch={onWatch} />
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Activity */}
+      <div className="room-section">
+        <div className="room-section-title">{t('rooms.history')}</div>
+        {room.history.length === 0 ? (
+          <div className="room-files-empty">{t('rooms.historyEmpty')}</div>
+        ) : (
+          <div className="room-history">
+            {room.history.slice().reverse().slice(0, 30).map((ev) => (
+              <div key={ev.id} className="room-history-item">
+                <span className="room-history-actor">{ev.actorName}</span>
+                <span className="room-history-text">{eventText(t, ev)}</span>
+                <span className="room-history-time">{shortTime(ev.at)}</span>
+              </div>
             ))}
           </div>
         )}

@@ -26,7 +26,8 @@ import fs from 'fs';
 import path from 'path';
 import WebTorrent from 'webtorrent';
 import { deriveKey, topicHash, randomPeerId, encrypt, decrypt } from './room-crypto';
-import { RoomFile, RoomMember, RoomState, RoomTransfer, PersistedRoomFile } from '../../shared/types';
+import { RoomFile, RoomMember, RoomState, RoomTransfer, PersistedRoomFile, RoomEvent } from '../../shared/types';
+import crypto from 'crypto';
 
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 const TrackerClient = require('bittorrent-tracker') as any;
@@ -53,10 +54,10 @@ function log(msg: string): void { try { ipcRenderer.send('room-log', msg); } cat
 
 // ── Gossip message shapes (post-decrypt) ───────────────────────────────────
 type Msg =
-  | { t: 'hello'; memberId: string; name: string; avatarSeed: string; have: string[]; files: RoomFile[]; tombs: string[]; roomName: string }
+  | { t: 'hello'; memberId: string; name: string; avatarSeed: string; have: string[]; files: RoomFile[]; tombs: string[]; roomName: string; ownerId: string }
   | { t: 'add'; file: RoomFile }
   | { t: 'have'; memberId: string; fileId: string }
-  | { t: 'ping'; memberId: string; name: string; avatarSeed: string; have: string[]; roomName: string }
+  | { t: 'ping'; memberId: string; name: string; avatarSeed: string; have: string[]; roomName: string; ownerId: string }
   // Remove a shared file from the room (everyone drops it; tombstone prevents resurrection).
   | { t: 'del'; fileId: string; memberId: string }
   // Watch-together: relayed verbatim to peers; the renderers keep playback in sync
@@ -77,11 +78,14 @@ interface Room {
   tracker: any;
   started: boolean;
   self: { memberId: string; name: string; avatarSeed: string };
+  ownerId: string;                       // memberId of the owner ('' until learned)
   wires: Map<number, Wire>;
   members: Map<string, RoomMember>;      // by memberId (excludes self)
   files: Map<string, RoomFile>;          // by fileId
   transfers: Map<string, RoomTransfer>;  // by fileId
   tombstones: Set<string>;               // deleted fileIds — never re-add them
+  mutes: Set<string>;                    // locally-muted memberIds (per install)
+  history: RoomEvent[];                  // activity log, newest last (capped)
   snapshotTimer: any;
   lastSnapshot: number;
 }
@@ -106,6 +110,8 @@ function ensureClient(iceServers: any[]): any {
 // ── Snapshot / state push ──────────────────────────────────────────────────
 function buildState(room: Room): RoomState {
   const now = Date.now();
+  const roleOf = (memberId: string): 'owner' | 'member' =>
+    (room.ownerId && memberId === room.ownerId) ? 'owner' : 'member';
   const self: RoomMember = {
     memberId: room.self.memberId,
     name: room.self.name || 'You',
@@ -116,10 +122,11 @@ function buildState(room: Room): RoomState {
     have: Array.from(room.files.values())
       .filter((f) => room.transfers.get(f.fileId)?.haveLocally)
       .map((f) => f.fileId),
+    role: roleOf(room.self.memberId),
   };
   const members: RoomMember[] = [self];
   for (const m of room.members.values()) {
-    members.push({ ...m, online: now - m.lastSeen < OFFLINE_AFTER, isSelf: false });
+    members.push({ ...m, online: now - m.lastSeen < OFFLINE_AFTER, isSelf: false, role: roleOf(m.memberId), muted: room.mutes.has(m.memberId) });
   }
   const transfers: Record<string, RoomTransfer> = {};
   for (const [k, v] of room.transfers) transfers[k] = v;
@@ -133,9 +140,12 @@ function buildState(room: Room): RoomState {
     folder: room.folder,
     topicHash: room.topic,
     createdAt: 0,
+    ownerId: room.ownerId,
+    canManage: !!room.ownerId && room.ownerId === room.self.memberId,
     members,
     files: Array.from(room.files.values()).sort((a, b) => a.addedAt - b.addedAt),
     transfers,
+    history: room.history.slice(-100),
     connected: room.started,
     peerCount: onlinePeers,
   };
@@ -174,7 +184,25 @@ function helloMsg(room: Room): Msg {
     files: Array.from(room.files.values()),
     tombs: Array.from(room.tombstones), // share deletions so peers converge
     roomName: room.name, // so a joiner (who only knows the code) learns the name
+    ownerId: room.ownerId, // so joiners learn who the owner is
   };
+}
+
+/** Append an activity-log event (in memory + persisted) and refresh the UI. */
+function logEvent(room: Room, ev: Omit<RoomEvent, 'id' | 'at'>): void {
+  const full: RoomEvent = { id: crypto.randomBytes(8).toString('hex'), at: Date.now(), ...ev };
+  room.history.push(full);
+  if (room.history.length > 200) room.history = room.history.slice(-200);
+  try { ipcRenderer.send('room-history-add', { roomId: room.roomId, event: full }); } catch { /* ignore */ }
+  pushState(room);
+}
+
+/** Learn who the room owner is from a peer (joiners start not knowing). First
+ *  claim wins; persisted so the role survives restart. */
+function maybeAdoptOwner(room: Room, incoming?: string): void {
+  if (!incoming || room.ownerId) return;
+  room.ownerId = incoming;
+  try { ipcRenderer.send('room-owner', { roomId: room.roomId, ownerId: incoming }); } catch { /* ignore */ }
 }
 
 /**
@@ -193,7 +221,7 @@ function maybeAdoptRoomName(room: Room, incoming?: string): void {
 function touchMember(room: Room, memberId: string, name: string, avatarSeed: string): RoomMember {
   let m = room.members.get(memberId);
   if (!m) {
-    m = { memberId, name, avatarSeed, online: true, isSelf: false, lastSeen: Date.now(), have: [] };
+    m = { memberId, name, avatarSeed, online: true, isSelf: false, lastSeen: Date.now(), have: [], role: 'member' };
     room.members.set(memberId, m);
   } else {
     m.name = name || m.name;
@@ -215,9 +243,12 @@ function onMessage(room: Room, wire: Wire, raw: any): void {
   switch (msg.t) {
     case 'hello': {
       wire.memberId = msg.memberId;
+      const isNew = !room.members.has(msg.memberId);
       const m = touchMember(room, msg.memberId, msg.name, msg.avatarSeed);
       m.have = Array.from(new Set(msg.have || []));
       maybeAdoptRoomName(room, msg.roomName);
+      maybeAdoptOwner(room, msg.ownerId);
+      if (isNew) logEvent(room, { type: 'joined', actorId: msg.memberId, actorName: msg.name || '?' });
       // Apply peer deletions first so their HELLO file list can't re-add them.
       for (const id of msg.tombs || []) applyTombstone(room, id);
       for (const f of msg.files || []) mergeFile(room, f);
@@ -226,9 +257,12 @@ function onMessage(room: Room, wire: Wire, raw: any): void {
     }
     case 'ping': {
       wire.memberId = msg.memberId;
+      const isNew = !room.members.has(msg.memberId);
       const m = touchMember(room, msg.memberId, msg.name, msg.avatarSeed);
       m.have = Array.from(new Set(msg.have || []));
       maybeAdoptRoomName(room, msg.roomName);
+      maybeAdoptOwner(room, msg.ownerId);
+      if (isNew) logEvent(room, { type: 'joined', actorId: msg.memberId, actorName: msg.name || '?' });
       pushState(room);
       break;
     }
@@ -244,7 +278,9 @@ function onMessage(room: Room, wire: Wire, raw: any): void {
       break;
     }
     case 'del': {
-      applyTombstone(room, msg.fileId);
+      if (room.mutes.has(msg.memberId)) break; // ignore deletes from a muted member
+      const actor = room.members.get(msg.memberId);
+      applyTombstone(room, msg.fileId, { id: msg.memberId, name: actor?.name || '?' });
       try { ipcRenderer.send('room-tomb', { roomId: room.roomId, fileId: msg.fileId }); } catch { /* ignore */ }
       pushState(room, true);
       break;
@@ -268,10 +304,12 @@ function onMessage(room: Room, wire: Wire, raw: any): void {
  * manifest/transfers, stops the torrent, and deletes the on-disk copy only when
  * it lives inside the room folder (never the original a member shared from).
  */
-function applyTombstone(room: Room, fileId: string): void {
+function applyTombstone(room: Room, fileId: string, by?: { id: string; name: string }): void {
   room.tombstones.add(fileId);
   // Drop it from the persisted manifest too so it isn't re-seeded next launch.
   try { ipcRenderer.send('room-manifest-del', { roomId: room.roomId, fileId }); } catch { /* ignore */ }
+  const existed = room.files.get(fileId);
+  if (existed) logEvent(room, { type: 'file-removed', actorId: by?.id || '', actorName: by?.name || '?', fileName: existed.name });
   const tr = room.transfers.get(fileId);
   if (client) { const t = client.get(fileId); if (t) { try { client.remove(t); } catch { /* ignore */ } } }
   room.files.delete(fileId);
@@ -301,9 +339,11 @@ function attachWire(room: Room, peer: any): void {
 function mergeFile(room: Room, file: RoomFile): void {
   if (!file || !file.fileId) return;
   if (room.tombstones.has(file.fileId)) return; // deleted — don't let a peer resurrect it
+  if (room.mutes.has(file.addedBy)) return;     // muted member — ignore their shares locally
   if (!room.files.has(file.fileId)) {
     room.files.set(file.fileId, file);
     persistManifest(room, file); // localPath filled in once the download lands
+    logEvent(room, { type: 'file-added', actorId: file.addedBy, actorName: file.addedByName || '?', fileName: file.name });
     ensureLocal(room, file);
   }
 }
@@ -434,7 +474,7 @@ function wireTorrentStats(room: Room, torrent: any): void {
 
 // ── Room lifecycle ───────────────────────────────────────────────────────────
 function startRoom(p: { roomId: string; name: string; code: string; folder: string;
-  self: { memberId: string; name: string; avatarSeed: string }; useTurn: boolean; turnServers?: any[]; tombstones?: string[]; manifest?: PersistedRoomFile[] }): RoomState {
+  self: { memberId: string; name: string; avatarSeed: string }; useTurn: boolean; turnServers?: any[]; tombstones?: string[]; manifest?: PersistedRoomFile[]; ownerId?: string; mutes?: string[]; history?: RoomEvent[] }): RoomState {
   let room = rooms.get(p.roomId);
   if (room) return buildState(room);
 
@@ -456,15 +496,23 @@ function startRoom(p: { roomId: string; name: string; code: string; folder: stri
     tracker: null,
     started: false,
     self: p.self,
+    ownerId: p.ownerId || '',
     wires: new Map(),
     members: new Map(),
     files: new Map(),
     transfers: new Map(),
     tombstones: new Set(p.tombstones || []),
+    mutes: new Set(p.mutes || []),
+    history: (p.history || []).slice(-200),
     snapshotTimer: null,
     lastSnapshot: 0,
   };
   rooms.set(p.roomId, room);
+
+  // The owner logs the room's creation once (its history starts empty).
+  if (room.ownerId && room.ownerId === room.self.memberId && room.history.length === 0) {
+    logEvent(room, { type: 'created', actorId: room.self.memberId, actorName: room.self.name || 'You' });
+  }
 
   // Resume the persisted manifest first so the room shows — and re-seeds — its
   // files immediately, before any peer reconnects. Covers files shared from
@@ -510,7 +558,7 @@ function startRoom(p: { roomId: string; name: string; code: string; folder: stri
   const beat = setInterval(() => {
     const r = rooms.get(p.roomId);
     if (!r) { clearInterval(beat); return; }
-    broadcast(r, { t: 'ping', memberId: r.self.memberId, name: r.self.name || 'You', avatarSeed: r.self.avatarSeed, have: buildState(r).members[0].have, roomName: r.name });
+    broadcast(r, { t: 'ping', memberId: r.self.memberId, name: r.self.name || 'You', avatarSeed: r.self.avatarSeed, have: buildState(r).members[0].have, roomName: r.name, ownerId: r.ownerId });
     pushState(r);
   }, PING_INTERVAL);
 
@@ -525,6 +573,7 @@ function mergeFileLocal(room: Room, file: RoomFile, localPath?: string): void {
     room.files.set(file.fileId, file);
     setTransfer(room, file.fileId, { progress: 1, status: 'seeding', haveLocally: true, ...(localPath ? { localPath } : {}) });
     persistManifest(room, file, localPath);
+    logEvent(room, { type: 'file-added', actorId: file.addedBy, actorName: file.addedByName || 'You', fileName: file.name });
     broadcast(room, { t: 'add', file });
     pushState(room, true);
   }
@@ -581,7 +630,7 @@ function updateProfile(p: { name?: string; avatarSeed?: string }): void {
   for (const room of rooms.values()) {
     if (typeof p.name === 'string') room.self.name = p.name;
     if (typeof p.avatarSeed === 'string' && p.avatarSeed) room.self.avatarSeed = p.avatarSeed;
-    broadcast(room, { t: 'ping', memberId: room.self.memberId, name: room.self.name || 'You', avatarSeed: room.self.avatarSeed, have: buildState(room).members[0].have, roomName: room.name });
+    broadcast(room, { t: 'ping', memberId: room.self.memberId, name: room.self.name || 'You', avatarSeed: room.self.avatarSeed, have: buildState(room).members[0].have, roomName: room.name, ownerId: room.ownerId });
     pushState(room, true);
   }
 }
@@ -599,8 +648,20 @@ ipcRenderer.on('room-cmd', async (_e, msg: any) => {
     else if (type === 'removeFile') {
       const r = rooms.get(msg.roomId);
       if (r) {
-        applyTombstone(r, msg.fileId);
+        applyTombstone(r, msg.fileId, { id: r.self.memberId, name: r.self.name || 'You' });
         broadcast(r, { t: 'del', fileId: msg.fileId, memberId: r.self.memberId });
+        pushState(r, true);
+      }
+      data = { ok: true };
+    }
+    else if (type === 'mute') {
+      // Locally hide a member on THIS install (never broadcast, fully reversible).
+      // Future shares from them are ignored (see mergeFile); already-downloaded
+      // files are left alone, and unmute lets their shares back in via gossip.
+      const r = rooms.get(msg.roomId);
+      if (r) {
+        const targetId = String(msg.memberId || '');
+        if (msg.muted) r.mutes.add(targetId); else r.mutes.delete(targetId);
         pushState(r, true);
       }
       data = { ok: true };

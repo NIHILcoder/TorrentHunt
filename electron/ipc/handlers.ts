@@ -401,6 +401,10 @@ export function setupIpcHandlers(window: BrowserWindow): void {
     async (_event, roomId: string, fileId: string) => roomManager.removeFile(roomId, fileId)
   ));
 
+  ipcMain.handle('rooms:setMuted', wrapHandler('rooms:setMuted',
+    async (_event, roomId: string, memberId: string, muted: boolean) => roomManager.setMuted(roomId, memberId, !!muted)
+  ));
+
   ipcMain.handle('downloads:getTorrentInfo', wrapHandler('downloads:getTorrentInfo',
     async (_event, params: { torrentPath?: string; magnetUri?: string }) => {
       return torrentManager.getTorrentInfo(params);

@@ -114,6 +114,19 @@ export interface RoomMember {
   isSelf: boolean;
   lastSeen: number;
   have: string[];        // fileIds this member reports holding complete
+  role: 'owner' | 'member';  // owner = room creator; can kick + rekey
+  muted?: boolean;       // locally hidden/ignored on THIS install (not broadcast)
+}
+
+/** An entry in a room's activity log (locally observed; capped + persisted). */
+export interface RoomEvent {
+  id: string;
+  at: number;
+  type: 'created' | 'joined' | 'file-added' | 'file-removed' | 'kicked' | 'rekeyed';
+  actorId: string;       // who did it (memberId), '' if unknown
+  actorName: string;
+  fileName?: string;     // for file-added / file-removed
+  targetName?: string;   // for kicked (the removed member's name)
 }
 
 /** Local transfer status of one room file on this machine. */
@@ -136,9 +149,12 @@ export interface RoomState {
   folder: string;        // local shared folder path
   topicHash: string;     // sha1 rendezvous topic derived from the code
   createdAt: number;
+  ownerId: string;       // memberId of the room owner ('' until learned)
+  canManage: boolean;    // this install is the owner (may kick/rekey)
   members: RoomMember[];
   files: RoomFile[];
   transfers: Record<string, RoomTransfer>;
+  history: RoomEvent[];  // recent activity, newest last
   connected: boolean;    // tracker rendezvous connected
   peerCount: number;     // live gossip peers right now
 }
@@ -725,6 +741,7 @@ export interface IpcApi {
     watchFile: (roomId: string, fileId: string) => Promise<{ directUrl: string; hlsUrl: string; playerUrl: string; direct: boolean; kind: string; name: string }>;
     broadcastSync: (roomId: string, payload: { fileId: string; action: string; position: number; rate?: number; playing?: boolean }) => Promise<{ ok: boolean }>;
     removeFile: (roomId: string, fileId: string) => Promise<{ ok: boolean }>;
+    setMuted: (roomId: string, memberId: string, muted: boolean) => Promise<{ ok: boolean }>;
   };
   onRoomUpdate: (callback: (state: RoomState) => void) => () => void;
   onRoomSync: (callback: (msg: { roomId: string; fileId: string; action: string; position: number; rate: number; at: number; memberId: string; name: string; avatarSeed?: string; playing?: boolean }) => void) => () => void;

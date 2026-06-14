@@ -82,6 +82,22 @@ export class RoomManager {
     ipcMain.on('room-manifest-del', (_e, payload: { roomId: string; fileId: string }) => {
       try { if (payload?.roomId && payload?.fileId) db.removeRoomManifestFile(payload.roomId, payload.fileId); } catch { /* ignore */ }
     });
+    // A new activity-log event was observed — persist it (capped) so the room's
+    // history survives restart.
+    ipcMain.on('room-history-add', (_e, payload: { roomId: string; event: import('../../shared/types').RoomEvent }) => {
+      try { if (payload?.roomId && payload?.event?.id) db.appendRoomEvents(payload.roomId, [payload.event]); } catch { /* ignore */ }
+    });
+    // A joiner learned who the room owner is from a peer — persist it.
+    ipcMain.on('room-owner', (_e, payload: { roomId: string; ownerId: string }) => {
+      try {
+        if (!payload?.roomId || !payload?.ownerId) return;
+        const r = db.getPersistedRooms().find((x) => x.roomId === payload.roomId);
+        if (r && r.ownerId !== payload.ownerId) {
+          db.savePersistedRoom({ ...r, ownerId: payload.ownerId });
+          log.info('Room owner learned from peer', { roomId: payload.roomId });
+        }
+      } catch { /* ignore */ }
+    });
     // A joiner learned the room's friendly name from a peer (it had only the
     // code) — persist it so the name survives restart and shows in the list even
     // before the room reconnects. Live UI updates ride the normal room-update.
@@ -152,7 +168,7 @@ export class RoomManager {
     return path.join(base, 'Rooms');
   }
 
-  private async joinPayload(roomId: string, name: string, code: string, folder: string) {
+  private async joinPayload(roomId: string, name: string, code: string, folder: string, ownerId?: string) {
     const profile = db.getRoomProfile();
     let useTurn = true;
     try { useTurn = (await db.getSettings()).shareUseTurn !== false; } catch { /* default on */ }
@@ -165,6 +181,9 @@ export class RoomManager {
         turnServers: TURN_SERVERS,
         tombstones: db.getRoomTombstones(roomId),
         manifest: db.getRoomManifest(roomId),
+        ownerId: ownerId ?? '',
+        mutes: db.getRoomMutes(roomId),
+        history: db.getRoomHistory(roomId),
       },
     };
   }
@@ -188,8 +207,9 @@ export class RoomManager {
     const folder = path.join(await this.roomsBase(), slugify(name) + '-' + roomId.slice(0, 6));
     fs.mkdirSync(folder, { recursive: true });
     const createdAt = Date.now();
-    db.savePersistedRoom({ roomId, name, code, folder, createdAt });
-    const { type, payload } = await this.joinPayload(roomId, name, code, folder);
+    const ownerId = db.getRoomProfile().memberId; // the creator owns the room
+    db.savePersistedRoom({ roomId, name, code, folder, createdAt, ownerId });
+    const { type, payload } = await this.joinPayload(roomId, name, code, folder, ownerId);
     const state = await this.call<RoomState>(type, { payload });
     state.createdAt = createdAt;
     this.cache.set(roomId, state);
@@ -216,7 +236,7 @@ export class RoomManager {
   }
 
   private async reactivate(r: db.PersistedRoom): Promise<RoomState> {
-    const { type, payload } = await this.joinPayload(r.roomId, r.name, r.code, r.folder);
+    const { type, payload } = await this.joinPayload(r.roomId, r.name, r.code, r.folder, r.ownerId);
     const state = await this.call<RoomState>(type, { payload });
     state.createdAt = r.createdAt;
     this.cache.set(r.roomId, state);
@@ -228,6 +248,8 @@ export class RoomManager {
     db.deletePersistedRoom(roomId);
     db.clearRoomTombstones(roomId);
     db.clearRoomManifest(roomId);
+    db.clearRoomHistory(roomId);
+    db.clearRoomMutes(roomId);
     this.cache.delete(roomId);
     return { ok: true };
   }
@@ -309,6 +331,15 @@ export class RoomManager {
     db.addRoomTombstone(roomId, fileId);
     if (this.win && !this.win.isDestroyed() && this.ready) {
       this.win.webContents.send('room-cmd', { type: 'removeFile', reqId: ++this.reqSeq, roomId, fileId });
+    }
+    return { ok: true };
+  }
+
+  /** Locally hide/ignore a member on this install (reversible, never broadcast). */
+  async setMuted(roomId: string, memberId: string, muted: boolean): Promise<{ ok: boolean }> {
+    db.setRoomMute(roomId, memberId, muted);
+    if (this.win && !this.win.isDestroyed() && this.ready) {
+      this.win.webContents.send('room-cmd', { type: 'mute', reqId: ++this.reqSeq, roomId, memberId, muted });
     }
     return { ok: true };
   }

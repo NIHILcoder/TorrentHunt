@@ -19,7 +19,7 @@
  */
 
 import Store from 'electron-store';
-import { Download, AppSettings, SourceType, Category, SchedulerConfig, UserReputation, ReputationTransaction, PrivacyConfig, RSSFeed, RSSItem, SearchProvider, IPBlocklist, RoomProfile, PersistedRoomFile } from '../../shared/types';
+import { Download, AppSettings, SourceType, Category, SchedulerConfig, UserReputation, ReputationTransaction, PrivacyConfig, RSSFeed, RSSItem, SearchProvider, IPBlocklist, RoomProfile, PersistedRoomFile, RoomEvent } from '../../shared/types';
 import { v4 as uuidv4 } from 'uuid';
 import { app } from 'electron';
 import path from 'path';
@@ -64,6 +64,8 @@ interface RoomsSchema {
   roomProfile: RoomProfile | null;           // This install's identity in rooms
   roomTombstones: Record<string, string[]>;  // roomId → deleted fileIds (stop resurrection)
   roomManifests: Record<string, PersistedRoomFile[]>; // roomId → known files (resume on restart)
+  roomHistory: Record<string, RoomEvent[]>;  // roomId → activity log (capped)
+  roomMutes: Record<string, string[]>;       // roomId → locally-muted memberIds
 }
 
 interface ReputationSchema {
@@ -86,6 +88,7 @@ export interface PersistedRoom {
   code: string;
   folder: string;
   createdAt: number;
+  ownerId?: string;  // memberId of the room owner (creator); learned via gossip for joiners
 }
 
 const defaultCategories: Category[] = [
@@ -201,7 +204,7 @@ const searchStore = new Store<SearchSchema>({
 
 const roomsStore = new Store<RoomsSchema>({
   name: 'rooms',
-  defaults: { rooms: {}, roomProfile: null, roomTombstones: {}, roomManifests: {} },
+  defaults: { rooms: {}, roomProfile: null, roomTombstones: {}, roomManifests: {}, roomHistory: {}, roomMutes: {} },
 });
 
 const reputationStore = new Store<ReputationSchema>({
@@ -295,6 +298,46 @@ export function clearRoomManifest(roomId: string): void {
   const all = roomsStore.get('roomManifests') ?? {};
   delete all[roomId];
   roomsStore.set('roomManifests', all);
+}
+
+// === Room activity history (locally-observed event log) ===
+
+export function getRoomHistory(roomId: string): RoomEvent[] {
+  return (roomsStore.get('roomHistory') ?? {})[roomId] ?? [];
+}
+
+export function appendRoomEvents(roomId: string, events: RoomEvent[]): void {
+  if (!events.length) return;
+  const all = roomsStore.get('roomHistory') ?? {};
+  const list = (all[roomId] ?? []).concat(events).slice(-200); // cap
+  all[roomId] = list;
+  roomsStore.set('roomHistory', all);
+}
+
+export function clearRoomHistory(roomId: string): void {
+  const all = roomsStore.get('roomHistory') ?? {};
+  delete all[roomId];
+  roomsStore.set('roomHistory', all);
+}
+
+// === Room mutes (locally-hidden members — per install, never broadcast) ===
+
+export function getRoomMutes(roomId: string): string[] {
+  return (roomsStore.get('roomMutes') ?? {})[roomId] ?? [];
+}
+
+export function setRoomMute(roomId: string, memberId: string, muted: boolean): void {
+  const all = roomsStore.get('roomMutes') ?? {};
+  const set = new Set(all[roomId] ?? []);
+  if (muted) set.add(memberId); else set.delete(memberId);
+  all[roomId] = Array.from(set);
+  roomsStore.set('roomMutes', all);
+}
+
+export function clearRoomMutes(roomId: string): void {
+  const all = roomsStore.get('roomMutes') ?? {};
+  delete all[roomId];
+  roomsStore.set('roomMutes', all);
 }
 
 // === Web remote token (lazily generated, persisted) ===

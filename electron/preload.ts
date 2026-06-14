@@ -502,6 +502,8 @@ const api: IpcApi = {
       ipcRenderer.invoke('rooms:broadcastSync', roomId, payload),
     removeFile: (roomId: string, fileId: string): Promise<{ ok: boolean }> =>
       ipcRenderer.invoke('rooms:removeFile', roomId, fileId),
+    setMuted: (roomId: string, memberId: string, muted: boolean): Promise<{ ok: boolean }> =>
+      ipcRenderer.invoke('rooms:setMuted', roomId, memberId, muted),
   },
 
   onRoomUpdate: (callback: (state: RoomState) => void): (() => void) => {
