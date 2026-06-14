@@ -6,7 +6,7 @@ import crypto from 'crypto';
 import https from 'https';
 import http from 'http';
 import { URL } from 'url';
-import { app } from 'electron';
+import { getHostEnv } from './host/env';
 import {
   Download,
   DownloadStatus,
@@ -36,7 +36,7 @@ import { spawn, ChildProcess } from 'child_process';
 const ffmpegStaticPath = require('ffmpeg-static') as string | null;
 function resolveFfmpegPath(): string | null {
   if (!ffmpegStaticPath) return null;
-  return app.isPackaged
+  return getHostEnv().isPackaged
     ? ffmpegStaticPath.replace('app.asar', 'app.asar.unpacked')
     : ffmpegStaticPath;
 }
@@ -242,7 +242,7 @@ export class TorrentManager {
    * 20 bytes total, no machine-identifying data; rotates every launch.
    */
   private generateEphemeralPeerId(): Buffer {
-    const digits = app.getVersion().replace(/\D/g, '').padEnd(4, '0').slice(0, 4);
+    const digits = getHostEnv().version.replace(/\D/g, '').padEnd(4, '0').slice(0, 4);
     const prefix = `-TH${digits}-`;
     const random = crypto.randomBytes(20 - prefix.length).toString('hex').slice(0, 20 - prefix.length);
     return Buffer.from(prefix + random);
@@ -572,7 +572,7 @@ export class TorrentManager {
           sourceInput = fs.readFileSync(params.torrentPath);
         }
 
-        tempClient.add(sourceInput, { path: app.getPath('temp') }, (torrent) => {
+        tempClient.add(sourceInput, { path: getHostEnv().tempDir }, (torrent) => {
           if (resolved) return;
           
           clearTimeout(timeout);
@@ -653,7 +653,7 @@ export class TorrentManager {
         const parsed = new URL(current);
         const lib = parsed.protocol === 'https:' ? https : http;
         const req = lib.get(current, {
-          headers: { 'User-Agent': `TorrentHunt/${app.getVersion()}`, 'Accept': 'application/x-bittorrent, */*' },
+          headers: { 'User-Agent': `TorrentHunt/${getHostEnv().version}`, 'Accept': 'application/x-bittorrent, */*' },
           timeout: 30000,
         }, (res) => {
           if (res.statusCode && res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
@@ -847,7 +847,7 @@ export class TorrentManager {
 
       // If it's a torrent file, copy it (local path or freshly-fetched temp) to app data
       if (params.sourceType === 'torrent_file') {
-        const appDataDir = path.join(app.getPath('userData'), 'torrents');
+        const appDataDir = path.join(getHostEnv().userDataDir, 'torrents');
         if (!fs.existsSync(appDataDir)) {
           fs.mkdirSync(appDataDir, { recursive: true });
         }
@@ -1790,7 +1790,7 @@ export class TorrentManager {
       // (a magnet-sourced torrent would otherwise need peers to re-verify).
       const fields: Partial<Download> = { savePath: this.autoMovePath };
       if (metaBuffer) {
-        const dir = path.join(app.getPath('userData'), 'torrents');
+        const dir = path.join(getHostEnv().userDataDir, 'torrents');
         if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
         const tf = path.join(dir, `${id}.torrent`);
         try {
