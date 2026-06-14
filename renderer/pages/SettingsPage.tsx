@@ -78,7 +78,8 @@ const SettingsPage: React.FC = () => {
   // Advanced settings (proxy UI removed — WebTorrent has no proxy support;
   // PEX/LSD toggles removed — not switchable/implemented in WebTorrent)
   const [enableDHT, setEnableDHT] = useState(true);
-  const [maxConnections, setMaxConnections] = useState(100);
+  const [maxConnections, setMaxConnections] = useState(55);
+  const [maxConnectionsGlobal, setMaxConnectionsGlobal] = useState(200);
   const [portMin, setPortMin] = useState(6881);
   const [portForwarding, setPortForwarding] = useState(true);
   const [pfStatus, setPfStatus] = useState<PortForwardStatus | null>(null);
@@ -223,6 +224,7 @@ const SettingsPage: React.FC = () => {
       maxActiveDownloads !== s.maxActiveDownloads ||
       // Advanced
       maxConnections !== s.maxConnections ||
+      maxConnectionsGlobal !== (s.maxConnectionsGlobal ?? 200) ||
       portMin !== s.portMin ||
       // Watch folder
       watchFolderPath !== s.watchFolderPath ||
@@ -236,7 +238,7 @@ const SettingsPage: React.FC = () => {
     setHasChanges(changed);
   }, [
     settings, defaultDownloadDir, maxDownKbps, maxUpKbps, altDownKbps, altUpKbps, maxActiveDownloads,
-    maxConnections, portMin,
+    maxConnections, maxConnectionsGlobal, portMin,
     watchFolderPath, autoMovePath, diskGuardMinFreeMB,
     defaultSeedRatioLimit, defaultSeedTimeLimitMinutes,
   ]);
@@ -274,7 +276,8 @@ const SettingsPage: React.FC = () => {
 
       // Advanced settings
       setEnableDHT(s.enableDHT ?? true);
-      setMaxConnections(s.maxConnections ?? 100);
+      setMaxConnections(s.maxConnections ?? 55);
+      setMaxConnectionsGlobal(s.maxConnectionsGlobal ?? 200);
       setPortMin(s.portMin ?? 6881);
       setPortForwarding(s.portForwarding ?? true);
 
@@ -419,6 +422,7 @@ const SettingsPage: React.FC = () => {
         // Advanced
         enableDHT,
         maxConnections,
+        maxConnectionsGlobal,
         portMin,
         // Watch folder
         watchFolderEnabled,
@@ -485,7 +489,8 @@ const SettingsPage: React.FC = () => {
       setAltDownKbps(settings.altDownKbps ?? 0);
       setAltUpKbps(settings.altUpKbps ?? 0);
       setMaxActiveDownloads(settings.maxActiveDownloads);
-      setMaxConnections(settings.maxConnections ?? 100);
+      setMaxConnections(settings.maxConnections ?? 55);
+      setMaxConnectionsGlobal(settings.maxConnectionsGlobal ?? 200);
       setPortMin(settings.portMin ?? 6881);
       setWatchFolderPath(settings.watchFolderPath ?? '');
       setAutoMovePath(settings.autoMovePath ?? '');
@@ -1052,7 +1057,19 @@ const SettingsPage: React.FC = () => {
               min="10"
               max="500"
               value={maxConnections}
-              onChange={(e) => setMaxConnections(parseInt(e.target.value) || 100)}
+              onChange={(e) => setMaxConnections(parseInt(e.target.value) || 55)}
+            />
+          )}
+          {renderSettingItem(
+            t('settings.maxConnGlobal'),
+            t('settings.maxConnGlobal.desc'),
+            <input
+              type="number"
+              className="input-compact input-mono"
+              min="20"
+              max="2000"
+              value={maxConnectionsGlobal}
+              onChange={(e) => setMaxConnectionsGlobal(parseInt(e.target.value) || 200)}
             />
           )}
         </div>

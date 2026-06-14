@@ -198,6 +198,13 @@ export class TorrentManager {
   private maxActiveDownloads = 3;
   private maxDownKbps = 0;
   private maxUpKbps = 0;
+  // Connection limits. maxConnections is the per-torrent ceiling; maxConnectionsGlobal
+  // is the total budget across all live torrents. The effective per-torrent limit
+  // (client.maxConns, read live by WebTorrent on every connect) is scaled down as
+  // more torrents run so the total never exceeds the global budget.
+  private maxConnections = 55;
+  private maxConnectionsGlobal = 200;
+  private static readonly MIN_CONNS_PER_TORRENT = 20;
   // Alternative ("turbo"/turtle) speed limits and whether they're active.
   private altSpeedEnabled = false;
   private altDownKbps = 0;
@@ -259,6 +266,8 @@ export class TorrentManager {
     this.autoMovePath = settings.autoMovePath ?? '';
     this.defaultSeedRatioLimit = settings.defaultSeedRatioLimit ?? 0;
     this.defaultSeedTimeLimitMinutes = settings.defaultSeedTimeLimitMinutes ?? 0;
+    this.maxConnections = settings.maxConnections > 0 ? settings.maxConnections : 55;
+    this.maxConnectionsGlobal = settings.maxConnectionsGlobal > 0 ? settings.maxConnectionsGlobal : 200;
 
     log.debug('Settings loaded', {
       maxActiveDownloads: this.maxActiveDownloads,
@@ -281,7 +290,10 @@ export class TorrentManager {
       peerId: this.generateEphemeralPeerId(),
       utp: false,
       dht: settings.enableDHT !== false,
-      maxConns: settings.maxConnections > 0 ? settings.maxConnections : 100,
+      // Start at the per-torrent ceiling; applyConnectionLimit() scales it down
+      // live as more torrents go active (WebTorrent reads client.maxConns on every
+      // connection attempt, so changing it throttles all torrents immediately).
+      maxConns: this.maxConnections,
       torrentPort: this.configuredPort,
       // -1 = unlimited (0 would mean "0 bytes/sec" and stall all traffic).
       // Effective limits honour the alternative-speed toggle.
@@ -367,6 +379,9 @@ export class TorrentManager {
     // Process queue
     await this.processQueue();
 
+    // Balance the connection budget across whatever restored live.
+    this.applyConnectionLimit();
+
     this.resolveInitDone();
     log.info('TorrentManager initialized successfully');
   }
@@ -441,6 +456,8 @@ export class TorrentManager {
       // Clear error message when transitioning out of error state
       managed.download.lastError = null;
     }
+    // The set of live torrents may have changed — rebalance the connection budget.
+    this.applyConnectionLimit();
   }
 
   /**
@@ -1316,6 +1333,39 @@ export class TorrentManager {
       }
     }
     return count;
+  }
+
+  /** Torrents holding a live WebTorrent instance (downloading OR seeding) — both
+   *  open peer connections, so both count against the global connection budget. */
+  private liveTorrentCount(): number {
+    let count = 0;
+    for (const managed of this.managedTorrents.values()) {
+      if (managed.torrent && (managed.download.status === 'downloading' || managed.download.status === 'seeding')) {
+        count++;
+      }
+    }
+    return count;
+  }
+
+  /**
+   * Scale the per-torrent connection ceiling (client.maxConns, read live by
+   * WebTorrent) so the total across all live torrents stays within the global
+   * budget. Prevents flooding the router's NAT table / exhausting OS sockets —
+   * the cause of "torrents kill my whole internet" and crashes under load.
+   */
+  private applyConnectionLimit(): void {
+    if (!this.client) return;
+    const perTorrentCeiling = this.maxConnections > 0 ? this.maxConnections : 55;
+    const globalCap = this.maxConnectionsGlobal > 0 ? this.maxConnectionsGlobal : perTorrentCeiling;
+    const live = Math.max(1, this.liveTorrentCount());
+    const effective = Math.max(
+      TorrentManager.MIN_CONNS_PER_TORRENT,
+      Math.min(perTorrentCeiling, Math.floor(globalCap / live))
+    );
+    if ((this.client as any).maxConns !== effective) {
+      (this.client as any).maxConns = effective;
+      log.debug('Connection limit applied', { live, perTorrentCeiling, globalCap, effectivePerTorrent: effective });
+    }
   }
 
   /**
@@ -2322,8 +2372,15 @@ export class TorrentManager {
     autoMovePath?: string;
     defaultSeedRatioLimit?: number;
     defaultSeedTimeLimitMinutes?: number;
+    maxConnections?: number;
+    maxConnectionsGlobal?: number;
   }): Promise<void> {
     log.debug('Updating settings', settings);
+
+    let connDirty = false;
+    if (settings.maxConnections !== undefined && settings.maxConnections > 0) { this.maxConnections = settings.maxConnections; connDirty = true; }
+    if (settings.maxConnectionsGlobal !== undefined && settings.maxConnectionsGlobal > 0) { this.maxConnectionsGlobal = settings.maxConnectionsGlobal; connDirty = true; }
+    if (connDirty) this.applyConnectionLimit();
 
     if (settings.maxActiveDownloads !== undefined) {
       this.maxActiveDownloads = settings.maxActiveDownloads;

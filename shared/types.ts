@@ -243,7 +243,12 @@ export interface AppSettings {
   enableDHT: boolean;
   enablePEX: boolean;
   enableLSD: boolean;
-  maxConnections: number;
+  maxConnections: number;          // per-torrent connection ceiling
+  // Global connection budget across ALL torrents. The effective per-torrent limit
+  // is scaled down as more torrents run so the total never exceeds this — prevents
+  // saturating the router's NAT table / exhausting OS sockets (which can drop the
+  // whole machine's connectivity and crash the engine under load).
+  maxConnectionsGlobal: number;
   portMin: number;
   portMax: number;
   portForwarding: boolean;         // Forward the listening port via UPnP (default true)
