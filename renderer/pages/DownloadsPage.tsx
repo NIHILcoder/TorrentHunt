@@ -255,7 +255,7 @@ const DownloadItem: React.FC<DownloadItemProps> = ({
             />
           )}
 
-          {canResume(status) && (
+          {status === 'paused' && (
             <Button
               variant="ghost"
               size="sm"
@@ -370,7 +370,7 @@ const DownloadItem: React.FC<DownloadItemProps> = ({
             </Button>
           )}
 
-          {canResume(status) && (
+          {status === 'paused' && (
             <Button
               variant="ghost"
               size="sm"

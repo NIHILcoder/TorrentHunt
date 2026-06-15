@@ -28,7 +28,9 @@ export const Button: React.FC<ButtonProps> = ({
 }) => {
   const variantClass = variant !== 'default' ? `btn-${variant}` : '';
   const sizeClass = size !== 'md' ? `btn-${size}` : '';
-  const iconOnlyClass = iconOnly ? 'btn-icon' : '';
+  // CSS defines .btn-icon-only (square min-width); emitting 'btn-icon' meant
+  // icon buttons never got it and sized inconsistently.
+  const iconOnlyClass = iconOnly ? 'btn-icon-only' : '';
   
   const classes = ['btn', variantClass, sizeClass, iconOnlyClass, className]
     .filter(Boolean)

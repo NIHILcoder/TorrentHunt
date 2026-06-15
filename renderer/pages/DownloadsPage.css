@@ -845,6 +845,16 @@
   .download-item-actions { opacity: 1; }
 }
 
+/* Compact rows: reserve a fixed action column and right-align it, so the trailing
+   icons (Files / Remove) and the progress bars line up cleanly down the list no
+   matter which state-specific buttons (pause / play / folder / retry) a row shows.
+   min-width (not width) lets the transient remove-confirm still expand. */
+.download-item-compact .download-item-actions {
+  min-width: 150px;
+  justify-content: flex-end;
+  flex-shrink: 0;
+}
+
 .remove-confirm {
   display: flex;
   align-items: center;
