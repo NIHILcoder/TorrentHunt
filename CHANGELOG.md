@@ -4,6 +4,48 @@ All notable changes to TorrentHunt are documented here.
 This project follows [Keep a Changelog](https://keepachangelog.com/) and
 [Semantic Versioning](https://semver.org/).
 
+## [2.0.0-beta] - 2026-06-16
+
+A big architectural release. The torrent engine was moved off the main thread, the
+private-room feature set grew, startup got faster and smoother, and the app gained
+its first automated tests. Major version bump to reflect the scope — much of the
+internals changed. The private-room features remain **experimental** (not yet
+verified across two machines).
+
+### Changed
+- **The torrent engine now runs in a separate process.** WebTorrent + the download
+  manager + the in-app stream / transcode / cast servers moved into an Electron
+  utilityProcess. Hash-checking and piece I/O no longer run on the UI thread, so
+  **adding, restoring, or creating a torrent no longer freezes the window**. The
+  main process keeps a thin proxy with the same API; file bytes never cross the
+  process boundary (local HTTP + shared disk only).
+
+### Added
+- **Animated startup splash** in the app's black-and-white theme, shown until the
+  UI has its data so the app opens ready instead of building up piece by piece.
+- **Private rooms grew up (experimental):** rooms learn their real name from peers
+  (no more raw invite code); shared files survive a restart; an owner role +
+  activity log + locally hiding a member; remove a member (rotates the invite code
+  so they can't rejoin); and opt-in **end-to-end encrypted rooms** (file contents
+  encrypted before sharing).
+- **First automated tests** (Vitest) covering the state machine, the room
+  encryption, and IP-range matching.
+
+### Fixed
+- **Torrents no longer hammer your whole connection.** A global connection cap
+  (default 200 across all torrents) replaces the old per-torrent 100, so torrents
+  stop flooding the router / saturating sockets — which had degraded VPN/proxy and
+  could crash the engine under load.
+- **No startup disk thrash** with several torrents (restore honours the
+  active-download limit instead of starting everything at once).
+- **The drop-zone overlay** no longer gets stuck covering the UI.
+- **Download rows line up cleanly** regardless of state, and a queued torrent no
+  longer shows both Pause and Resume.
+- The app now renders in its **Inter font in production** (it was bundled instead
+  of loaded from a CDN the production CSP blocked).
+- Faster cold start: page components are **code-split / lazy-loaded** (initial
+  bundle roughly halved).
+
 ## [1.9.4-beta] - 2026-06-14
 
 A performance fix plus a wave of **experimental** private-room features. The
