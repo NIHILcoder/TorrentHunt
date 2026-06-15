@@ -34,7 +34,7 @@ export const Alert: React.FC<AlertProps> = ({
       {onClose && (
         <button
           onClick={onClose}
-          className="btn btn-ghost btn-icon btn-sm"
+          className="btn btn-ghost btn-icon-only btn-sm"
           style={{ marginLeft: 'auto' }}
         >
           <Icon name="x" size={16} />
