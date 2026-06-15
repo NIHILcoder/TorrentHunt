@@ -14,6 +14,7 @@ import RSSPage from './pages/RSSPage';
 import RoomsPage from './pages/RoomsPage';
 import { formatBytes } from './utils/format-helpers';
 import { I18nProvider } from './utils/i18nContext';
+import { dismissSplash } from './utils/splash';
 
 
 const AppContent: React.FC = () => {
@@ -63,7 +64,7 @@ const AppContent: React.FC = () => {
       } finally {
         // Initial data is in (or failed) — fade out the startup splash. Idempotent
         // and runs even on error, so the splash can never trap the user.
-        (window as unknown as { __thDismissSplash?: () => void }).__thDismissSplash?.();
+        dismissSplash();
       }
     };
     loadDownloads();

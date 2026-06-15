@@ -273,7 +273,7 @@ async function createWindow(): Promise<void> {
       sandbox: true,
     },
     title: 'TorrentHunt',
-    backgroundColor: '#0B0E17',
+    backgroundColor: '#000000', // matches the app + splash; no flash before paint
   });
 
   // Setup IPC handlers

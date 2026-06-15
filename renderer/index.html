@@ -9,47 +9,83 @@
   <title>TorrentHunt</title>
   <style>
     /* Startup splash — inlined so it paints in the very first frame, before the
-       app bundle parses. Held until the UI has its data, then faded out, so the
-       app never appears to build itself piece by piece. */
+       app bundle parses. Pure black-and-white to match the app's theme. The
+       dismiss logic lives in the bundle (renderer/utils/splash.ts), NOT an inline
+       <script>, because the production CSP (script-src 'self') blocks inline JS. */
     #th-splash {
       position: fixed; inset: 0; z-index: 99999;
-      display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 22px;
-      background: #0B0E17;
-      color: #f4f4f5;
+      display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 34px;
+      background: #000;
+      color: #fff;
       font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-      transition: opacity .45s ease;
+      transition: opacity .5s ease;
     }
     #th-splash.th-splash-out { opacity: 0; pointer-events: none; }
-    .th-mark { position: relative; width: 88px; height: 88px; display: grid; place-items: center; }
-    .th-ring {
-      position: absolute; inset: 0; border-radius: 22px;
-      border: 2px solid rgba(255,255,255,.10);
-      border-top-color: rgba(255,255,255,.85);
-      animation: th-spin 1s linear infinite;
+
+    .th-stage { position: relative; width: 180px; height: 180px; display: grid; place-items: center; }
+
+    /* Soft drifting glow behind everything */
+    .th-glow {
+      position: absolute; width: 240px; height: 240px; border-radius: 50%;
+      background: radial-gradient(circle, rgba(255,255,255,.18) 0%, transparent 62%);
+      filter: blur(8px);
+      animation: th-drift 9s ease-in-out infinite alternate;
     }
+
+    /* Expanding "sonar" rings — peers radiating outward (echoes the About hero) */
+    .th-sonar {
+      position: absolute; width: 84px; height: 84px; border-radius: 24px;
+      border: 1.5px solid rgba(255,255,255,.55);
+      opacity: 0;
+      animation: th-sonar 2.8s cubic-bezier(.22,1,.36,1) infinite;
+    }
+    .th-sonar.s2 { animation-delay: .95s; }
+    .th-sonar.s3 { animation-delay: 1.9s; }
+
+    /* White logo tile with a black glyph, gently floating + breathing */
     .th-tile {
-      width: 64px; height: 64px; border-radius: 16px;
+      position: relative; z-index: 1;
+      width: 72px; height: 72px; border-radius: 20px;
       display: grid; place-items: center;
-      background: linear-gradient(135deg, #20283a, #11151f);
-      border: 1px solid rgba(255,255,255,.08);
-      box-shadow: 0 10px 30px rgba(0,0,0,.45);
-      animation: th-pulse 2.2s ease-in-out infinite;
+      background: linear-gradient(145deg, #ffffff 0%, #c9c9cf 100%);
+      box-shadow: 0 12px 40px rgba(255,255,255,.14), inset 0 1px 0 rgba(255,255,255,.6);
+      animation: th-float 4.5s ease-in-out infinite;
     }
-    .th-tile svg { width: 30px; height: 30px; stroke: #f4f4f5; stroke-width: 2; fill: none; stroke-linecap: round; stroke-linejoin: round; }
-    .th-name { font-size: 17px; font-weight: 700; letter-spacing: .2px; }
-    .th-name b { font-weight: 800; }
-    .th-bar { width: 168px; height: 3px; border-radius: 3px; background: rgba(255,255,255,.08); overflow: hidden; }
-    .th-bar::before {
-      content: ''; display: block; width: 40%; height: 100%; border-radius: 3px;
-      background: rgba(255,255,255,.7);
-      animation: th-slide 1.15s ease-in-out infinite;
+    .th-tile svg { width: 30px; height: 30px; stroke: #000; stroke-width: 2; fill: none; stroke-linecap: round; stroke-linejoin: round; }
+    .th-tile .th-arrow { animation: th-arrow 1.8s ease-in-out infinite; }
+
+    .th-word {
+      font-size: 18px; font-weight: 600; letter-spacing: .4px;
+      opacity: 0; transform: translateY(8px);
+      animation: th-rise .7s cubic-bezier(.22,1,.36,1) .15s forwards;
     }
-    @keyframes th-spin { to { transform: rotate(360deg); } }
-    @keyframes th-pulse { 0%,100% { box-shadow: 0 10px 30px rgba(0,0,0,.45); } 50% { box-shadow: 0 10px 40px rgba(255,255,255,.10); } }
-    @keyframes th-slide { 0% { transform: translateX(-120%); } 100% { transform: translateX(320%); } }
+    .th-word b { font-weight: 800; }
+    .th-word .dim { color: #8C8C8F; }
+
+    @keyframes th-sonar {
+      0%   { opacity: .5;  transform: scale(.7); }
+      70%  { opacity: 0;   transform: scale(1.9); }
+      100% { opacity: 0;   transform: scale(1.9); }
+    }
+    @keyframes th-float {
+      0%, 100% { transform: translateY(0) scale(1); }
+      50%      { transform: translateY(-7px) scale(1.03); }
+    }
+    @keyframes th-arrow {
+      0%, 100% { transform: translateY(0); opacity: 1; }
+      50%      { transform: translateY(2px); opacity: .55; }
+    }
+    @keyframes th-drift {
+      from { transform: translate(-16px, -10px) scale(1); }
+      to   { transform: translate(16px, 12px) scale(1.12); }
+    }
+    @keyframes th-rise { to { opacity: 1; transform: translateY(0); } }
+
     @media (prefers-reduced-motion: reduce) {
-      .th-ring, .th-tile, .th-bar::before { animation: none; }
-      .th-ring { border-top-color: rgba(255,255,255,.4); }
+      .th-glow, .th-sonar, .th-tile, .th-tile .th-arrow { animation: none; }
+      .th-sonar { opacity: .18; }
+      .th-sonar.s2, .th-sonar.s3 { display: none; }
+      .th-word { animation: none; opacity: 1; transform: none; }
     }
   </style>
 </head>
@@ -57,38 +93,22 @@
   <div id="root"></div>
 
   <div id="th-splash" role="status" aria-label="Loading TorrentHunt">
-    <div class="th-mark">
-      <div class="th-ring"></div>
-      <div class="th-tile">
+    <div class="th-stage">
+      <span class="th-glow"></span>
+      <span class="th-sonar"></span>
+      <span class="th-sonar s2"></span>
+      <span class="th-sonar s3"></span>
+      <span class="th-tile">
         <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
           <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
-          <path d="M7 10l5 5 5-5"/>
-          <path d="M12 15V3"/>
+          <g class="th-arrow">
+            <path d="M7 10l5 5 5-5"/>
+            <path d="M12 15V3"/>
+          </g>
         </svg>
-      </div>
+      </span>
     </div>
-    <div class="th-name">Torrent<b>Hunt</b></div>
-    <div class="th-bar"></div>
+    <div class="th-word">Torrent<b>Hunt</b></div>
   </div>
-
-  <script>
-    // Dismiss the splash once the app reports its data is ready (window.__thDismissSplash),
-    // but keep it up for a minimum so it never flashes, and force it down after a max
-    // so a slow/stuck engine can never trap the user behind it.
-    (function () {
-      var MIN = 600, MAX = 7000, t0 = Date.now(), gone = false;
-      function go() {
-        if (gone) return; gone = true;
-        var s = document.getElementById('th-splash');
-        if (!s) return;
-        s.classList.add('th-splash-out');
-        setTimeout(function () { if (s && s.parentNode) s.parentNode.removeChild(s); }, 500);
-      }
-      window.__thDismissSplash = function () {
-        setTimeout(go, Math.max(0, MIN - (Date.now() - t0)));
-      };
-      setTimeout(go, MAX);
-    })();
-  </script>
 </body>
 </html>
