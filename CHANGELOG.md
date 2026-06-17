@@ -4,6 +4,13 @@ All notable changes to TorrentHunt are documented here.
 This project follows [Keep a Changelog](https://keepachangelog.com/) and
 [Semantic Versioning](https://semver.org/).
 
+## [2.0.1] - 2026-06-17
+
+### Added
+- **Downloads page fully localized** — all row text, status labels (Downloading,
+  Seeding, Queued, Paused, Error, Completed), and health-indicator badges
+  (Excellent, Good, Poor) are now translated in both English and Russian.
+
 ## [2.0.0-beta] - 2026-06-16
 
 A big architectural release. The torrent engine was moved off the main thread, the
