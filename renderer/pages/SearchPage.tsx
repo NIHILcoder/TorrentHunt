@@ -4,7 +4,7 @@
  */
 
 import React, { useState, useCallback, useEffect } from 'react';
-import { SearchResult, SearchProvider } from '../../shared/types';
+import { SearchResult, SearchProvider, PythonStatus } from '../../shared/types';
 import { Button, Icon, EmptyState } from '../components';
 import { useTranslation } from '../utils/i18nContext';
 import './SearchPage.css';
@@ -41,11 +41,24 @@ const SearchPage: React.FC = () => {
   const [showProviders, setShowProviders] = useState(false);
   const [providers, setProviders] = useState<SearchProvider[]>([]);
   const [newProvider, setNewProvider] = useState({
-    name: '', url: '', apiKey: '', type: 'jackett' as 'jackett' | 'torznab' | 'custom', enabled: true
+    name: '', url: '', apiKey: '', type: 'jackett' as 'jackett' | 'torznab' | 'custom' | 'script', enabled: true
   });
   const [savingProvider, setSavingProvider] = useState(false);
   const [testingId, setTestingId] = useState<string | null>(null);
   const [testResult, setTestResult] = useState<{ id: string; success: boolean; message: string } | null>(null);
+  const [pythonStatus, setPythonStatus] = useState<PythonStatus | null>(null);
+  const [checkingPython, setCheckingPython] = useState(false);
+
+  const checkPython = useCallback(async (force = false) => {
+    setCheckingPython(true);
+    try {
+      setPythonStatus(await window.api.search.checkPython(force));
+    } catch {
+      setPythonStatus({ found: false });
+    } finally {
+      setCheckingPython(false);
+    }
+  }, []);
 
   const loadProviders = useCallback(async () => {
     try {
@@ -56,8 +69,8 @@ const SearchPage: React.FC = () => {
     }
   }, []);
 
-  // Load providers on mount so the empty-state hint reflects the built-in
-  // Internet Archive provider (no network — just reads the local store).
+  // Load providers on mount so the empty-state hint reflects whether any
+  // provider is configured yet (no network — just reads the local store).
   useEffect(() => {
     loadProviders();
   }, [loadProviders]);
@@ -139,6 +152,22 @@ const SearchPage: React.FC = () => {
       await loadProviders();
     } catch (err: any) {
       alert(`Failed: ${err?.message}`);
+    }
+  };
+
+  const handleBrowseScript = async () => {
+    try {
+      const res = await window.api.dialog.showOpenDialog({
+        title: t('search.browse'),
+        properties: ['openFile'],
+        filters: [{ name: 'Python', extensions: ['py'] }],
+      });
+      if (!res.canceled && res.filePaths[0]) {
+        setNewProvider(p => ({ ...p, url: res.filePaths[0] }));
+        if (!pythonStatus) checkPython();
+      }
+    } catch (err) {
+      console.error('Browse failed:', err);
     }
   };
 
@@ -362,35 +391,75 @@ const SearchPage: React.FC = () => {
                 <select
                   className="form-select"
                   value={newProvider.type}
-                  onChange={e => setNewProvider(p => ({ ...p, type: e.target.value as any }))}
+                  onChange={e => {
+                    const type = e.target.value as typeof newProvider.type;
+                    setNewProvider(p => ({ ...p, type }));
+                    if (type === 'script' && !pythonStatus) checkPython();
+                  }}
                 >
                   <option value="jackett">Jackett</option>
                   <option value="torznab">Torznab (Prowlarr)</option>
                   <option value="custom">Custom JSON</option>
+                  <option value="script">{t('search.type.script')}</option>
                 </select>
               </div>
               <div className="form-row">
                 <input
-                  type="url"
+                  type={newProvider.type === 'script' ? 'text' : 'url'}
                   className="form-input"
                   placeholder={
                     newProvider.type === 'jackett'
                       ? 'http://localhost:9117'
                       : newProvider.type === 'torznab'
                       ? 'http://localhost:9696'
+                      : newProvider.type === 'script'
+                      ? 'C:\\plugins\\my-indexer.py'
                       : 'https://api.example.com/search?q={query}'
                   }
                   value={newProvider.url}
                   onChange={e => setNewProvider(p => ({ ...p, url: e.target.value }))}
                 />
-                <input
-                  type="text"
-                  className="form-input api-key-input"
-                  placeholder={t('search.provider.apiKey')}
-                  value={newProvider.apiKey}
-                  onChange={e => setNewProvider(p => ({ ...p, apiKey: e.target.value }))}
-                />
+                {newProvider.type === 'script' ? (
+                  <Button
+                    variant="secondary"
+                    type="button"
+                    onClick={handleBrowseScript}
+                    icon={<Icon name="folder" size={16} />}
+                  >
+                    {t('search.browse')}
+                  </Button>
+                ) : (
+                  <input
+                    type="text"
+                    className="form-input api-key-input"
+                    placeholder={t('search.provider.apiKey')}
+                    value={newProvider.apiKey}
+                    onChange={e => setNewProvider(p => ({ ...p, apiKey: e.target.value }))}
+                  />
+                )}
               </div>
+
+              {/* Python status — only relevant for script plugins */}
+              {newProvider.type === 'script' && (
+                <div className={`python-status ${pythonStatus?.found ? 'ok' : 'missing'}`}>
+                  <Icon name={pythonStatus?.found ? 'check-circle' : 'alert-circle'} size={14} />
+                  <span>
+                    {checkingPython
+                      ? t('search.python.checking')
+                      : pythonStatus?.found
+                      ? `${t('search.python.found')} ${pythonStatus.version || pythonStatus.path || ''}`
+                      : t('search.python.missing')}
+                  </span>
+                  <button
+                    type="button"
+                    className="python-recheck"
+                    disabled={checkingPython}
+                    onClick={() => checkPython(true)}
+                  >
+                    {t('search.python.recheck')}
+                  </button>
+                </div>
+              )}
               <Button
                 variant="primary"
                 loading={savingProvider}
@@ -409,6 +478,7 @@ const SearchPage: React.FC = () => {
                 <li><strong>Jackett:</strong> {t('search.guide.jackett')}</li>
                 <li><strong>Prowlarr:</strong> {t('search.guide.prowlarr')}</li>
                 <li><strong>Custom:</strong> {t('search.guide.custom')}</li>
+                <li><strong>{t('search.type.script')}:</strong> {t('search.guide.script')}</li>
               </ul>
             </div>
           </div>
