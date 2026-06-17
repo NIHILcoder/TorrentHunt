@@ -521,11 +521,18 @@ export interface RSSItem {
 export interface SearchProvider {
   id: string;
   name: string;
-  url: string;                  // Jackett base URL or custom API URL
+  url: string;                  // Jackett base URL or custom API URL (for 'script': absolute script path)
   apiKey?: string;
   enabled: boolean;
-  type: 'jackett' | 'torznab' | 'custom' | 'archive';
+  type: 'jackett' | 'torznab' | 'custom' | 'archive' | 'script';
   builtIn?: boolean;            // Pre-seeded provider (e.g. Internet Archive) — not user-removable
+}
+
+// Result of probing the host for a usable Python interpreter (for 'script' providers)
+export interface PythonStatus {
+  found: boolean;
+  path?: string;                // Resolved interpreter (e.g. "python3", "C:\\Python\\python.exe")
+  version?: string;             // e.g. "Python 3.12.1"
 }
 
 export interface SearchResult {
@@ -712,6 +719,7 @@ export interface IpcApi {
     updateProvider: (id: string, updates: Partial<SearchProvider>) => Promise<SearchProvider>;
     removeProvider: (id: string) => Promise<void>;
     testProvider: (id: string) => Promise<{ success: boolean; message: string }>;
+    checkPython: (force?: boolean) => Promise<PythonStatus>;
   };
 
   // Cast to a device on the LAN (HLS transcode / direct, with seeking)
