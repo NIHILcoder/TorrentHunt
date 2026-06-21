@@ -32,6 +32,7 @@ import * as db from './host/db-bridge';
 import { logger, checkDiskSpace, formatBytes } from '../utils';
 import { classifyMediaKind, isDirectlyPlayable } from '../../shared/media';
 import { spawn, ChildProcess } from 'child_process';
+import { AdaptiveThrottle } from './adaptive-throttle';
 
 // ffmpeg-static ships a platform binary; in a packaged app it lives in
 // app.asar.unpacked (it can't execute from inside the asar archive).
@@ -122,6 +123,22 @@ export class TorrentManager {
   private maxConnections = 55;
   private maxConnectionsGlobal = 200;
   private static readonly MIN_CONNS_PER_TORRENT = 20;
+  // Connection slow-start: after the client comes up we ramp the per-torrent
+  // connection ceiling from a low floor to its full value over RAMP_DURATION_MS,
+  // instead of opening a burst of sockets the instant torrents go live. That
+  // burst is what floods a cheap router's NAT table on startup (the classic
+  // "torrents kill my whole internet for the first minute"). 0 = ramp finished.
+  private connRampStartAt = 0;
+  private static readonly RAMP_START_CONNS = 20;
+  private static readonly RAMP_DURATION_MS = 45_000;
+  // Adaptive upload throttle (bufferbloat protection). Opt-in. When enabled it
+  // watches WAN latency and dynamically lowers the upload ceiling so seeding
+  // never strangles the rest of the connection. adaptiveUpBytes is its current
+  // ceiling (-1 = no adaptive cap); it's merged with the manual limit, most
+  // restrictive winning, in currentUpBytes().
+  private adaptiveUploadEnabled = false;
+  private adaptiveUpBytes = -1;
+  private adaptive: AdaptiveThrottle | null = null;
   // IP blocklist filtering runs here (where the WebTorrent client lives). Main
   // ships the merged, sorted ranges via applyIpBlocklist(); wires are hooked once.
   private blockedRanges: Array<[number, number]> = [];
@@ -189,6 +206,7 @@ export class TorrentManager {
     this.defaultSeedTimeLimitMinutes = settings.defaultSeedTimeLimitMinutes ?? 0;
     this.maxConnections = settings.maxConnections > 0 ? settings.maxConnections : 55;
     this.maxConnectionsGlobal = settings.maxConnectionsGlobal > 0 ? settings.maxConnectionsGlobal : 200;
+    this.adaptiveUploadEnabled = settings.adaptiveUpload === true;
 
     log.debug('Settings loaded', {
       maxActiveDownloads: this.maxActiveDownloads,
@@ -217,14 +235,22 @@ export class TorrentManager {
       maxConns: this.maxConnections,
       torrentPort: this.configuredPort,
       // -1 = unlimited (0 would mean "0 bytes/sec" and stall all traffic).
-      // Effective limits honour the alternative-speed toggle.
-      downloadLimit: this.effectiveDownBytes(),
-      uploadLimit: this.effectiveUpBytes(),
+      // Effective limits honour the alternative-speed toggle + adaptive throttle.
+      downloadLimit: this.currentDownBytes(),
+      uploadLimit: this.currentUpBytes(),
     } as any);
 
     this.client.on('error', (err: string | Error) => {
       log.error('WebTorrent client error', { error: err });
     });
+
+    // Begin connection slow-start immediately, before any torrent is restored,
+    // so the very first wave of peer connections is rate-limited too.
+    this.connRampStartAt = Date.now();
+    this.applyConnectionLimit();
+
+    // Bring up the adaptive upload throttle if the user opted in.
+    if (this.adaptiveUploadEnabled) this.startAdaptiveThrottle();
 
     // Load all downloads; permanently purge any stale 'removed' records left by older
     // app versions that used markAsRemoved instead of deleteDownload. This prevents
@@ -1279,13 +1305,32 @@ export class TorrentManager {
     const perTorrentCeiling = this.maxConnections > 0 ? this.maxConnections : 55;
     const globalCap = this.maxConnectionsGlobal > 0 ? this.maxConnectionsGlobal : perTorrentCeiling;
     const live = Math.max(1, this.liveTorrentCount());
-    const effective = Math.max(
+    const target = Math.max(
       TorrentManager.MIN_CONNS_PER_TORRENT,
       Math.min(perTorrentCeiling, Math.floor(globalCap / live))
     );
+
+    // Connection slow-start: while the ramp window is open, clamp the applied
+    // ceiling to a value that climbs linearly from RAMP_START_CONNS to the full
+    // target. Re-evaluated each stats tick (see startStatsBroadcast) so it
+    // progresses smoothly; the window self-closes once elapsed.
+    let effective = target;
+    if (this.connRampStartAt > 0) {
+      const elapsed = Date.now() - this.connRampStartAt;
+      if (elapsed >= TorrentManager.RAMP_DURATION_MS) {
+        this.connRampStartAt = 0; // ramp complete
+      } else {
+        const frac = elapsed / TorrentManager.RAMP_DURATION_MS;
+        const ramped = Math.round(
+          TorrentManager.RAMP_START_CONNS + (target - TorrentManager.RAMP_START_CONNS) * frac
+        );
+        effective = Math.max(TorrentManager.RAMP_START_CONNS, Math.min(target, ramped));
+      }
+    }
+
     if ((this.client as any).maxConns !== effective) {
       (this.client as any).maxConns = effective;
-      log.debug('Connection limit applied', { live, perTorrentCeiling, globalCap, effectivePerTorrent: effective });
+      log.debug('Connection limit applied', { live, target, effective, ramping: this.connRampStartAt > 0 });
     }
   }
 
@@ -2263,6 +2308,9 @@ export class TorrentManager {
     }
     
     this.statsInterval = setInterval(async () => {
+      // Advance connection slow-start while its window is open (cheap no-op once done).
+      if (this.connRampStartAt > 0) this.applyConnectionLimit();
+
       const stats = this.getStats();
 
       // Broadcast to callbacks every tick (in-memory, cheap) so the UI stays smooth
@@ -2319,6 +2367,7 @@ export class TorrentManager {
     defaultSeedTimeLimitMinutes?: number;
     maxConnections?: number;
     maxConnectionsGlobal?: number;
+    adaptiveUpload?: boolean;
   }): Promise<void> {
     log.debug('Updating settings', settings);
 
@@ -2326,6 +2375,13 @@ export class TorrentManager {
     if (settings.maxConnections !== undefined && settings.maxConnections > 0) { this.maxConnections = settings.maxConnections; connDirty = true; }
     if (settings.maxConnectionsGlobal !== undefined && settings.maxConnectionsGlobal > 0) { this.maxConnectionsGlobal = settings.maxConnectionsGlobal; connDirty = true; }
     if (connDirty) this.applyConnectionLimit();
+
+    // Adaptive upload throttle on/off — takes effect live.
+    if (settings.adaptiveUpload !== undefined && settings.adaptiveUpload !== this.adaptiveUploadEnabled) {
+      this.adaptiveUploadEnabled = settings.adaptiveUpload;
+      if (this.adaptiveUploadEnabled) this.startAdaptiveThrottle();
+      else this.stopAdaptiveThrottle();
+    }
 
     if (settings.maxActiveDownloads !== undefined) {
       this.maxActiveDownloads = settings.maxActiveDownloads;
@@ -2353,7 +2409,7 @@ export class TorrentManager {
 
   // ── Speed limits (normal vs alternative/"turbo") ──────────────────────────
 
-  /** Effective download cap in bytes/sec (-1 = unlimited), honouring alt mode. */
+  /** Manual download cap in bytes/sec (-1 = unlimited), honouring alt mode. */
   private effectiveDownBytes(): number {
     const kbps = this.altSpeedEnabled ? this.altDownKbps : this.maxDownKbps;
     return kbps > 0 ? kbps * 1024 : -1;
@@ -2363,15 +2419,56 @@ export class TorrentManager {
     return kbps > 0 ? kbps * 1024 : -1;
   }
 
+  /** Adaptive throttle governs upload only; download follows the manual cap. */
+  private currentDownBytes(): number {
+    return this.effectiveDownBytes();
+  }
+  /** Merge the manual upload cap with the adaptive ceiling: most restrictive
+   *  positive value wins; -1 from both means unlimited. */
+  private currentUpBytes(): number {
+    const manual = this.effectiveUpBytes();
+    const adaptive = this.adaptiveUpBytes;
+    if (manual > 0 && adaptive > 0) return Math.min(manual, adaptive);
+    if (manual > 0) return manual;
+    if (adaptive > 0) return adaptive;
+    return -1;
+  }
+
   /** Push the current effective limits to the live WebTorrent client. */
   private applySpeedLimits(): void {
-    try { (this.client as any).throttleDownload?.(this.effectiveDownBytes()); } catch (_) { /* unsupported */ }
-    try { (this.client as any).throttleUpload?.(this.effectiveUpBytes()); } catch (_) { /* unsupported */ }
+    try { (this.client as any).throttleDownload?.(this.currentDownBytes()); } catch (_) { /* unsupported */ }
+    try { (this.client as any).throttleUpload?.(this.currentUpBytes()); } catch (_) { /* unsupported */ }
     log.info('Speed limits applied', {
       alt: this.altSpeedEnabled,
       downKbps: this.altSpeedEnabled ? this.altDownKbps : this.maxDownKbps,
       upKbps: this.altSpeedEnabled ? this.altUpKbps : this.maxUpKbps,
+      adaptiveUpKBs: this.adaptiveUpBytes > 0 ? Math.round(this.adaptiveUpBytes / 1024) : 'off',
     });
+  }
+
+  // ── Adaptive upload throttle (bufferbloat protection) ─────────────────────
+
+  /** Start the latency-driven upload throttle. Idempotent. */
+  private startAdaptiveThrottle(): void {
+    if (!this.adaptive) {
+      this.adaptive = new AdaptiveThrottle({
+        getUploadBps: () => {
+          try { return (this.client as any)?.uploadSpeed ?? 0; } catch { return 0; }
+        },
+        onCap: (bytes) => {
+          this.adaptiveUpBytes = bytes;
+          this.applySpeedLimits();
+        },
+      });
+    }
+    this.adaptive.start();
+  }
+
+  /** Stop the throttle and clear any adaptive cap so manual limits alone apply. */
+  private stopAdaptiveThrottle(): void {
+    this.adaptive?.stop();
+    this.adaptiveUpBytes = -1;
+    this.applySpeedLimits();
   }
 
   /** One-click toggle of the alternative ("turbo"/turtle) speed limits. */
@@ -2795,6 +2892,11 @@ export class TorrentManager {
    */
   async destroy(): Promise<void> {
     log.info('Destroying TorrentManager');
+
+    if (this.adaptive) {
+      this.adaptive.stop();
+      this.adaptive = null;
+    }
 
     if (this.statsInterval) {
       clearInterval(this.statsInterval);

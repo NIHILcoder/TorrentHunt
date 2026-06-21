@@ -252,6 +252,11 @@ export interface AppSettings {
   portMin: number;
   portMax: number;
   portForwarding: boolean;         // Forward the listening port via UPnP (default true)
+  // Adaptive upload throttle ("bufferbloat protection"). When on, the engine
+  // watches WAN latency and auto-lowers the upload rate so seeding never chokes
+  // the rest of the connection — no manual KB/s tuning needed. Opt-in because it
+  // makes periodic lightweight latency probes to a public host (default false).
+  adaptiveUpload: boolean;
   // Proxy settings
   proxyEnabled: boolean;
   proxyType: 'http' | 'https' | 'socks5';

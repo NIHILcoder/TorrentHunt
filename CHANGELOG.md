@@ -4,6 +4,26 @@ All notable changes to TorrentHunt are documented here.
 This project follows [Keep a Changelog](https://keepachangelog.com/) and
 [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Added
+- **Adaptive upload throttle ("protect my internet").** Opt-in mode (Settings →
+  Network → Smart upload limit) that watches WAN latency and automatically lowers
+  the upload rate the moment seeding starts choking the rest of your connection,
+  then speeds back up when the line is clear — an AIMD control loop, so no manual
+  KB/s tuning is ever needed. Solves the classic "torrents kill my whole internet"
+  bufferbloat problem that fixed caps in other clients don't.
+- **Connection slow-start.** The per-torrent connection ceiling now ramps up from
+  a low floor over the first ~45s instead of opening a burst of sockets the instant
+  torrents go live, which floods cheap routers' NAT tables on startup. Always on.
+
+### Fixed
+- **VPN detection no longer inverted.** `ipMismatch` was always true behind a home
+  NAT (local `192.168.x.x` ≠ public IP), so the privacy dashboard reported "VPN
+  active" with no VPN and "exposed" with one running. Detection now relies on
+  interface/DNS/route signals plus an ISP-org fallback for VPNs on non-standard
+  interfaces (IKEv2/SSTP).
+
 ## [2.1.0] - 2026-06-17
 
 ### Added

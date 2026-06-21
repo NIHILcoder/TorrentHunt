@@ -130,6 +130,7 @@ const configStore = new Store<ConfigSchema>({
       portMin: 6881,
       portMax: 6889,
       portForwarding: true,
+      adaptiveUpload: false,
       // Proxy
       proxyEnabled: false,
       proxyType: 'http' as const,

@@ -63,6 +63,7 @@ const SettingsPage: React.FC = () => {
   // Network settings
   const [maxDownKbps, setMaxDownKbps] = useState(0);
   const [maxUpKbps, setMaxUpKbps] = useState(0);
+  const [adaptiveUpload, setAdaptiveUpload] = useState(false);
   const [maxActiveDownloads, setMaxActiveDownloads] = useState(3);
   // Alternative ("turbo") speed limits
   const [altSpeedEnabled, setAltSpeedEnabled] = useState(false);
@@ -265,6 +266,7 @@ const SettingsPage: React.FC = () => {
       setDefaultDownloadDir(s.defaultDownloadDir);
       setMaxDownKbps(s.maxDownKbps);
       setMaxUpKbps(s.maxUpKbps);
+      setAdaptiveUpload(s.adaptiveUpload ?? false);
       setMaxActiveDownloads(s.maxActiveDownloads);
       setAltSpeedEnabled(s.altSpeedEnabled ?? false);
       setAltDownKbps(s.altDownKbps ?? 0);
@@ -915,6 +917,22 @@ const SettingsPage: React.FC = () => {
         <div className="settings-notice-compact">
           <Icon name="info" size={14} />
           <span>{t('settings.speedNote')}</span>
+        </div>
+
+        <div className="settings-divider" />
+
+        {/* Adaptive upload throttle — "smart" limit that needs no manual KB/s. */}
+        <div className="settings-group">
+          <h3 className="settings-group-title">{t('settings.grp.smartLimit')}</h3>
+          {renderSettingItem(
+            t('settings.adaptiveUpload'),
+            t('settings.adaptiveUpload.desc'),
+            renderToggle(adaptiveUpload, () => applyToggle(!adaptiveUpload, setAdaptiveUpload, { adaptiveUpload: !adaptiveUpload }))
+          )}
+          <div className="settings-notice-compact">
+            <Icon name="info" size={14} />
+            <span>{t('settings.adaptiveUpload.note')}</span>
+          </div>
         </div>
 
         <div className="settings-divider" />

@@ -432,6 +432,7 @@ export function setupIpcHandlers(window: BrowserWindow): void {
         maxUpKbps: updated.maxUpKbps,
         maxConnections: updated.maxConnections,
         maxConnectionsGlobal: updated.maxConnectionsGlobal,
+        adaptiveUpload: updated.adaptiveUpload,
       });
 
       // Restart the disk-space guard if its settings changed
