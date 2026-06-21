@@ -4,7 +4,7 @@ All notable changes to TorrentHunt are documented here.
 This project follows [Keep a Changelog](https://keepachangelog.com/) and
 [Semantic Versioning](https://semver.org/).
 
-## [Unreleased]
+## [2.2.0] - 2026-06-22
 
 ### Added
 - **Adaptive upload throttle ("protect my internet").** Opt-in mode (Settings →
@@ -12,7 +12,9 @@ This project follows [Keep a Changelog](https://keepachangelog.com/) and
   the upload rate the moment seeding starts choking the rest of your connection,
   then speeds back up when the line is clear — an AIMD control loop, so no manual
   KB/s tuning is ever needed. Solves the classic "torrents kill my whole internet"
-  bufferbloat problem that fixed caps in other clients don't.
+  bufferbloat problem that fixed caps in other clients don't. A live indicator
+  shows the current latency vs its unloaded baseline, the cap it has settled on,
+  and the upload rate — so you can watch it adapt in real time.
 - **Connection slow-start.** The per-torrent connection ceiling now ramps up from
   a low floor over the first ~45s instead of opening a burst of sockets the instant
   torrents go live, which floods cheap routers' NAT tables on startup. Always on.
