@@ -133,6 +133,7 @@ function buildState(room: Room): RoomState {
   };
   const members: RoomMember[] = [self];
   for (const m of room.members.values()) {
+    if (m.memberId === room.self.memberId) continue; // never show self as a remote member (self-loop guard)
     members.push({ ...m, online: now - m.lastSeen < OFFLINE_AFTER, isSelf: false, role: roleOf(m.memberId), muted: room.mutes.has(m.memberId) });
   }
   const transfers: Record<string, RoomTransfer> = {};
@@ -283,6 +284,20 @@ function touchMember(room: Room, memberId: string, name: string, avatarSeed: str
   return m;
 }
 
+/**
+ * Tear down a wire that turned out to be a loopback to ourselves. The rendezvous
+ * tracker can pair us with our own announce (common on a single machine and
+ * across multiple trackers); such a wire delivers our OWN gossip, which — if
+ * adopted — adds us as a phantom "second" member that flickers online/offline as
+ * the loop sporadically delivers, and can't be kicked (you can't kick yourself).
+ */
+function dropSelfWire(room: Room, wire: Wire): void {
+  try { wire.peer?.destroy(); } catch { /* ignore */ }
+  room.wires.delete(wire.id);
+  // Clean up any phantom self-entry an earlier loop message may have created.
+  if (room.members.delete(room.self.memberId)) pushState(room, true);
+}
+
 function onMessage(room: Room, wire: Wire, raw: any): void {
   let msg: Msg;
   try {
@@ -290,6 +305,13 @@ function onMessage(room: Room, wire: Wire, raw: any): void {
     msg = decrypt<Msg>(room.key, text);
   } catch {
     // Wrong key / not a member / corrupt — ignore silently.
+    return;
+  }
+  // Self-connection guard: any identity-bearing message carrying OUR memberId
+  // came from a loopback wire — drop it (and the wire) so we never add ourselves
+  // as a remote member. ('add'/'rekey' carry no memberId and are idempotent.)
+  if ((msg as any).memberId && (msg as any).memberId === room.self.memberId) {
+    dropSelfWire(room, wire);
     return;
   }
   switch (msg.t) {
