@@ -1,3 +1,6 @@
+// MUST be first: sets an isolated userData dir for `TH_INSTANCE` test copies
+// before electron-store / the logger read the path at module load.
+import { isSecondaryInstance } from './app-instance';
 import { app, BrowserWindow, Tray, Menu, nativeImage, Notification, shell, session, ipcMain, screen } from 'electron';
 import path from 'path';
 import dotenv from 'dotenv';
@@ -47,11 +50,13 @@ ipcMain.on('app:rendererReady', () => {
 });
 
 // === Single Instance Lock ===
-const gotTheLock = app.requestSingleInstanceLock();
+// Isolated test copies (TH_INSTANCE) skip the lock so they run alongside the
+// primary instead of just focusing its window — see app-instance.ts.
+const gotTheLock = isSecondaryInstance ? true : app.requestSingleInstanceLock();
 
 if (!gotTheLock) {
   app.quit();
-} else {
+} else if (!isSecondaryInstance) {
   app.on('second-instance', (_event, commandLine) => {
     // Someone tried to run a second instance — focus existing window
     if (mainWindow) {
@@ -272,9 +277,19 @@ async function createWindow(): Promise<void> {
       nodeIntegration: false,
       sandbox: true,
     },
-    title: 'TorrentHunt',
+    // Test copies (TH_INSTANCE) get a labelled title so two windows on one
+    // machine are tellable apart while verifying rooms/share links.
+    title: isSecondaryInstance ? `TorrentHunt — ${process.env.TH_INSTANCE}` : 'TorrentHunt',
     backgroundColor: '#000000', // matches the app + splash; no flash before paint
   });
+
+  // Keep the instance label in the title bar: the renderer's <title> would
+  // otherwise overwrite it the moment the page loads.
+  if (isSecondaryInstance) {
+    const label = `TorrentHunt — ${process.env.TH_INSTANCE}`;
+    mainWindow.on('page-title-updated', (e) => { e.preventDefault(); mainWindow?.setTitle(label); });
+    mainWindow.setTitle(label);
+  }
 
   // Setup IPC handlers
   setupIpcHandlers(mainWindow);
