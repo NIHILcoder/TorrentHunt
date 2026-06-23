@@ -226,6 +226,37 @@ export interface DownloadStats {
   status: DownloadStatus;
 }
 
+/** A DNS-over-HTTPS resolver the engine can route tracker/peer lookups through.
+ *  `url` is a DoH JSON endpoint (RFC 8484 JSON, i.e. accepts `?name=&type=` and
+ *  returns `{ Answer: [...] }`). Built-in presets use literal-IP endpoints so they
+ *  work even when the system resolver itself is down. */
+export interface DohTemplate {
+  id: string;
+  name: string;
+  url: string;
+  builtIn?: boolean;
+}
+
+/** Built-in DoH resolvers. IP-based endpoints so resolving them needs no DNS
+ *  (avoids a bootstrap loop and survives a broken router resolver). */
+export const BUILTIN_DOH_TEMPLATES: DohTemplate[] = [
+  { id: 'cloudflare',          name: 'Cloudflare (1.1.1.1)',           url: 'https://1.1.1.1/dns-query', builtIn: true },
+  { id: 'cloudflare-security', name: 'Cloudflare — block malware (1.1.1.2)', url: 'https://1.1.1.2/dns-query', builtIn: true },
+  { id: 'google',              name: 'Google (8.8.8.8)',               url: 'https://8.8.8.8/resolve',   builtIn: true },
+];
+
+/** Resolve the active DoH endpoint URL from settings + custom templates. Pure so
+ *  both the main process and the torrent host can compute it identically.
+ *  Returns '' when DoH is off or the selected template no longer exists. */
+export function resolveActiveDohUrl(
+  s: { dohEnabled: boolean; dohTemplateId: string },
+  custom: DohTemplate[],
+): string {
+  if (!s.dohEnabled) return '';
+  const all = [...BUILTIN_DOH_TEMPLATES, ...(custom || [])];
+  return all.find((t) => t.id === s.dohTemplateId)?.url || '';
+}
+
 export interface AppSettings {
   id: number;
   defaultDownloadDir: string;
@@ -259,6 +290,14 @@ export interface AppSettings {
   // the rest of the connection — no manual KB/s tuning needed. Opt-in because it
   // makes periodic lightweight latency probes to a public host (default false).
   adaptiveUpload: boolean;
+  // DNS-over-HTTPS for the torrent engine. When on, tracker/peer hostnames are
+  // resolved through an encrypted DoH resolver instead of the OS/router DNS —
+  // bypasses a broken or censoring router resolver and hides which trackers you
+  // contact from the ISP. Opt-in (default false). dohTemplateId selects the
+  // active resolver from the built-in + custom template list.
+  dohEnabled: boolean;
+  dohTemplateId: string;
+  dohCustomTemplates: DohTemplate[];
   // Proxy settings
   proxyEnabled: boolean;
   proxyType: 'http' | 'https' | 'socks5';
@@ -689,6 +728,11 @@ export interface IpcApi {
   checkVPN: () => Promise<VPNDetectionResult>;
   getIpInfo: () => Promise<IpInfo>;
   getNetworkHealth: () => Promise<NetworkHealth>;
+  // DNS-over-HTTPS resolver management
+  getDohTemplates: () => Promise<DohTemplate[]>;                       // built-in + custom
+  addDohTemplate: (name: string, url: string) => Promise<DohTemplate>; // add a custom resolver
+  deleteDohTemplate: (id: string) => Promise<{ ok: boolean }>;         // remove a custom resolver
+  testDohResolver: (url: string) => Promise<{ ok: boolean; ms?: number; ip?: string; error?: string }>;
   isEncryptionAvailable: () => Promise<boolean>;
   clearAllData: () => Promise<{ success: boolean }>;
   openLogsFolder: () => Promise<{ ok: boolean }>;

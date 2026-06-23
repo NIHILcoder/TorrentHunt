@@ -4,6 +4,23 @@ All notable changes to TorrentHunt are documented here.
 This project follows [Keep a Changelog](https://keepachangelog.com/) and
 [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Added
+- **DNS-over-HTTPS for the torrent engine.** Opt-in (Settings → Network →
+  DNS-over-HTTPS): resolve tracker/peer hostnames through an encrypted DoH
+  resolver instead of the OS/router DNS. Survives a broken or overloaded router
+  resolver (built-in presets use direct-IP endpoints, so reaching them needs no
+  DNS at all) and hides which trackers you contact from the ISP. Ships Cloudflare,
+  Cloudflare-malware-blocking and Google presets, with a picker, a per-resolver
+  Test button, and **custom resolver templates** you can add and remove.
+
+### Rooms (experimental)
+- Local two-instance testing via `TH_INSTANCE` (isolated profile, no single-
+  instance lock); fixed a self-connection phantom member; a kicked member now
+  gets an explicit "you were removed" banner; leaving broadcasts so peers drop
+  you immediately (no offline ghost); clearer four-state connection indicator.
+
 ## [2.2.0] - 2026-06-22
 
 ### Added

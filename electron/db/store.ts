@@ -131,6 +131,9 @@ const configStore = new Store<ConfigSchema>({
       portMax: 6889,
       portForwarding: true,
       adaptiveUpload: false,
+      dohEnabled: false,
+      dohTemplateId: 'cloudflare',
+      dohCustomTemplates: [],
       // Proxy
       proxyEnabled: false,
       proxyType: 'http' as const,

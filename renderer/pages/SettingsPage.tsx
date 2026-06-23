@@ -5,7 +5,7 @@
  */
 
 import React, { useState, useEffect } from 'react';
-import { AppSettings, SchedulerConfig, ScheduleEntry, PortForwardStatus, NetworkHealth } from '../../shared/types';
+import { AppSettings, SchedulerConfig, ScheduleEntry, PortForwardStatus, NetworkHealth, DohTemplate } from '../../shared/types';
 import {
   Button,
   Icon,
@@ -65,6 +65,14 @@ const SettingsPage: React.FC = () => {
   const [maxUpKbps, setMaxUpKbps] = useState(0);
   const [adaptiveUpload, setAdaptiveUpload] = useState(false);
   const [netHealth, setNetHealth] = useState<NetworkHealth | null>(null);
+  // DNS-over-HTTPS
+  const [dohEnabled, setDohEnabled] = useState(false);
+  const [dohTemplateId, setDohTemplateId] = useState('cloudflare');
+  const [dohTemplates, setDohTemplates] = useState<DohTemplate[]>([]);
+  const [dohNewName, setDohNewName] = useState('');
+  const [dohNewUrl, setDohNewUrl] = useState('');
+  const [dohAdding, setDohAdding] = useState(false);
+  const [dohTest, setDohTest] = useState<{ id: string; state: 'testing' | 'ok' | 'err'; text: string } | null>(null);
   const [maxActiveDownloads, setMaxActiveDownloads] = useState(3);
   // Alternative ("turbo") speed limits
   const [altSpeedEnabled, setAltSpeedEnabled] = useState(false);
@@ -281,6 +289,9 @@ const SettingsPage: React.FC = () => {
       setMaxDownKbps(s.maxDownKbps);
       setMaxUpKbps(s.maxUpKbps);
       setAdaptiveUpload(s.adaptiveUpload ?? false);
+      setDohEnabled(s.dohEnabled ?? false);
+      setDohTemplateId(s.dohTemplateId ?? 'cloudflare');
+      window.api.getDohTemplates().then(setDohTemplates).catch(() => {});
       setMaxActiveDownloads(s.maxActiveDownloads);
       setAltSpeedEnabled(s.altSpeedEnabled ?? false);
       setAltDownKbps(s.altDownKbps ?? 0);
@@ -411,6 +422,49 @@ const SettingsPage: React.FC = () => {
       setMessage({ type: 'error', text: t('settings.msg.autosaveFailed') });
       await loadSettings();
     }
+  };
+
+  // ── DNS-over-HTTPS ─────────────────────────────────────────────────────────
+  // Selecting a resolver persists + applies live (like a toggle), so it doesn't
+  // go through the Save bar.
+  const selectDohTemplate = async (id: string) => {
+    setDohTemplateId(id);
+    setSettings((prev) => (prev ? { ...prev, dohTemplateId: id } : prev));
+    try { await window.api.updateSettings({ dohTemplateId: id }); }
+    catch (err) { console.error('Failed to set DoH resolver:', err); await loadSettings(); }
+  };
+
+  const addDohTemplate = async () => {
+    if (!dohNewUrl.trim()) return;
+    setDohAdding(true);
+    try {
+      const tpl = await window.api.addDohTemplate(dohNewName.trim() || dohNewUrl.trim(), dohNewUrl.trim());
+      setDohTemplates(await window.api.getDohTemplates());
+      setDohNewName(''); setDohNewUrl('');
+      await selectDohTemplate(tpl.id); // make the new one active
+      setMessage({ type: 'success', text: t('settings.doh.added') });
+    } catch (e) {
+      setMessage({ type: 'error', text: String(e instanceof Error ? e.message : e) });
+    } finally { setDohAdding(false); }
+  };
+
+  const deleteDohTemplate = async (id: string) => {
+    try {
+      await window.api.deleteDohTemplate(id);
+      setDohTemplates(await window.api.getDohTemplates());
+      const s = await window.api.getSettings();
+      setDohTemplateId(s.dohTemplateId ?? 'cloudflare');
+      setSettings(s);
+    } catch (e) { setMessage({ type: 'error', text: String(e instanceof Error ? e.message : e) }); }
+  };
+
+  const testDohTemplate = async (tpl: DohTemplate) => {
+    setDohTest({ id: tpl.id, state: 'testing', text: t('settings.doh.testing') });
+    try {
+      const r = await window.api.testDohResolver(tpl.url);
+      if (r.ok) setDohTest({ id: tpl.id, state: 'ok', text: `${r.ms} ms · ${r.ip}` });
+      else setDohTest({ id: tpl.id, state: 'err', text: r.error || t('settings.doh.testFail') });
+    } catch (e) { setDohTest({ id: tpl.id, state: 'err', text: String(e instanceof Error ? e.message : e) }); }
   };
 
   // Watch-folder toggles need the live path + both flags pushed to the watcher.
@@ -952,6 +1006,11 @@ const SettingsPage: React.FC = () => {
 
         <div className="settings-divider" />
 
+        {/* DNS-over-HTTPS */}
+        {renderDohSection()}
+
+        <div className="settings-divider" />
+
         {/* Alternative ("turbo"/turtle) speed limits */}
         <div className="settings-group">
           <h3 className="settings-group-title">{t('settings.grp.altSpeed')}</h3>
@@ -1217,6 +1276,88 @@ const SettingsPage: React.FC = () => {
         <div className="adaptive-health-metrics">
           <span>{t('settings.adaptive.latency')}: <strong>{lat != null ? `${lat} ms` : '—'}</strong>{base != null ? ` / ${base} ms` : ''}</span>
           <span>{t('settings.adaptive.upload')}: <strong>{netHealth ? fmtSpeed(netHealth.uploadBps) : '—'}</strong></span>
+        </div>
+      </div>
+    );
+  }
+
+  // DNS-over-HTTPS resolver picker + custom-template management.
+  function renderDohSection() {
+    return (
+      <div className="settings-group">
+        <h3 className="settings-group-title">{t('settings.grp.doh')}</h3>
+        {renderSettingItem(
+          t('settings.doh'),
+          t('settings.doh.desc'),
+          renderToggle(dohEnabled, () => applyToggle(!dohEnabled, setDohEnabled, { dohEnabled: !dohEnabled }))
+        )}
+
+        {dohEnabled && (
+          <div className="doh-panel">
+            <div className="doh-resolvers">
+              {dohTemplates.map((tpl) => (
+                <div key={tpl.id} className={`doh-resolver ${dohTemplateId === tpl.id ? 'active' : ''}`}>
+                  <label className="doh-resolver-pick">
+                    <input
+                      type="radio"
+                      name="doh-resolver"
+                      checked={dohTemplateId === tpl.id}
+                      onChange={() => selectDohTemplate(tpl.id)}
+                    />
+                    <span className="doh-resolver-info">
+                      <span className="doh-resolver-name">{tpl.name}{!tpl.builtIn && <span className="doh-badge">{t('settings.doh.custom')}</span>}</span>
+                      <span className="doh-resolver-url">{tpl.url}</span>
+                      {dohTest && dohTest.id === tpl.id && (
+                        <span className={`doh-test-result ${dohTest.state}`}>{dohTest.text}</span>
+                      )}
+                    </span>
+                  </label>
+                  <div className="doh-resolver-actions">
+                    <button className="doh-mini-btn" onClick={() => testDohTemplate(tpl)} title={t('settings.doh.test')}>
+                      <Icon name="activity" size={13} />
+                    </button>
+                    {!tpl.builtIn && (
+                      <button className="doh-mini-btn danger" onClick={() => deleteDohTemplate(tpl.id)} title={t('settings.doh.delete')}>
+                        <Icon name="trash" size={13} />
+                      </button>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* Add a custom resolver */}
+            <div className="doh-add">
+              <div className="doh-add-title">{t('settings.doh.addTitle')}</div>
+              <div className="doh-add-row">
+                <input
+                  className="input-compact doh-add-name"
+                  placeholder={t('settings.doh.namePlaceholder')}
+                  value={dohNewName}
+                  onChange={(e) => setDohNewName(e.target.value)}
+                />
+                <input
+                  className="input-compact input-mono doh-add-url"
+                  placeholder="https://1.1.1.1/dns-query"
+                  value={dohNewUrl}
+                  onChange={(e) => setDohNewUrl(e.target.value)}
+                  onKeyDown={(e) => e.key === 'Enter' && addDohTemplate()}
+                />
+                <Button variant="secondary" size="sm" onClick={addDohTemplate} loading={dohAdding} disabled={!dohNewUrl.trim()} icon={<Icon name="plus" size={14} />}>
+                  {t('settings.doh.add')}
+                </Button>
+              </div>
+              <div className="settings-notice-compact">
+                <Icon name="info" size={14} />
+                <span>{t('settings.doh.customHint')}</span>
+              </div>
+            </div>
+          </div>
+        )}
+
+        <div className="settings-notice-compact">
+          <Icon name="info" size={14} />
+          <span>{t('settings.doh.note')}</span>
         </div>
       </div>
     );

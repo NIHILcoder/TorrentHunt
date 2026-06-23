@@ -34,6 +34,8 @@ import { logger, checkDiskSpace, formatBytes } from '../utils';
 import { classifyMediaKind, isDirectlyPlayable } from '../../shared/media';
 import { spawn, ChildProcess } from 'child_process';
 import { AdaptiveThrottle } from './adaptive-throttle';
+import { installDohLookup, configureDoh } from './host/doh-lookup';
+import { resolveActiveDohUrl, DohTemplate } from '../../shared/types';
 
 // ffmpeg-static ships a platform binary; in a packaged app it lives in
 // app.asar.unpacked (it can't execute from inside the asar archive).
@@ -140,6 +142,12 @@ export class TorrentManager {
   private adaptiveUploadEnabled = false;
   private adaptiveUpBytes = -1;
   private adaptive: AdaptiveThrottle | null = null;
+  // DNS-over-HTTPS: resolve tracker/peer hostnames through an encrypted resolver
+  // instead of the OS/router DNS. State mirrors the relevant settings so live
+  // changes (toggle / template / custom list) can be re-applied without restart.
+  private dohEnabled = false;
+  private dohTemplateId = 'cloudflare';
+  private dohCustomTemplates: DohTemplate[] = [];
   // IP blocklist filtering runs here (where the WebTorrent client lives). Main
   // ships the merged, sorted ranges via applyIpBlocklist(); wires are hooked once.
   private blockedRanges: Array<[number, number]> = [];
@@ -208,6 +216,14 @@ export class TorrentManager {
     this.maxConnections = settings.maxConnections > 0 ? settings.maxConnections : 55;
     this.maxConnectionsGlobal = settings.maxConnectionsGlobal > 0 ? settings.maxConnectionsGlobal : 200;
     this.adaptiveUploadEnabled = settings.adaptiveUpload === true;
+    this.dohEnabled = settings.dohEnabled === true;
+    this.dohTemplateId = settings.dohTemplateId || 'cloudflare';
+    this.dohCustomTemplates = Array.isArray(settings.dohCustomTemplates) ? settings.dohCustomTemplates : [];
+    // Install the DoH-aware dns.lookup once and apply the current config. The
+    // patch is a transparent passthrough while disabled, so this is safe even
+    // when the user hasn't opted in.
+    installDohLookup();
+    this.applyDohConfig();
 
     log.debug('Settings loaded', {
       maxActiveDownloads: this.maxActiveDownloads,
@@ -2369,8 +2385,17 @@ export class TorrentManager {
     maxConnections?: number;
     maxConnectionsGlobal?: number;
     adaptiveUpload?: boolean;
+    dohEnabled?: boolean;
+    dohTemplateId?: string;
+    dohCustomTemplates?: DohTemplate[];
   }): Promise<void> {
     log.debug('Updating settings', settings);
+
+    let dohDirty = false;
+    if (settings.dohEnabled !== undefined) { this.dohEnabled = settings.dohEnabled; dohDirty = true; }
+    if (settings.dohTemplateId !== undefined) { this.dohTemplateId = settings.dohTemplateId; dohDirty = true; }
+    if (settings.dohCustomTemplates !== undefined) { this.dohCustomTemplates = settings.dohCustomTemplates; dohDirty = true; }
+    if (dohDirty) this.applyDohConfig();
 
     let connDirty = false;
     if (settings.maxConnections !== undefined && settings.maxConnections > 0) { this.maxConnections = settings.maxConnections; connDirty = true; }
@@ -2470,6 +2495,15 @@ export class TorrentManager {
     this.adaptive?.stop();
     this.adaptiveUpBytes = -1;
     this.applySpeedLimits();
+  }
+
+  /** Recompute the active DoH resolver URL from current state and apply it. */
+  private applyDohConfig(): void {
+    const url = resolveActiveDohUrl(
+      { dohEnabled: this.dohEnabled, dohTemplateId: this.dohTemplateId },
+      this.dohCustomTemplates,
+    );
+    configureDoh({ enabled: this.dohEnabled, url });
   }
 
   /** One-click toggle of the alternative ("turbo"/turtle) speed limits. */

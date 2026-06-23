@@ -234,6 +234,19 @@ const api: IpcApi = {
     return ipcRenderer.invoke('network:getHealth');
   },
 
+  getDohTemplates: () => {
+    return ipcRenderer.invoke('doh:getTemplates');
+  },
+  addDohTemplate: (name: string, url: string) => {
+    return ipcRenderer.invoke('doh:addTemplate', name, url);
+  },
+  deleteDohTemplate: (id: string) => {
+    return ipcRenderer.invoke('doh:deleteTemplate', id);
+  },
+  testDohResolver: (url: string) => {
+    return ipcRenderer.invoke('doh:test', url);
+  },
+
   isEncryptionAvailable: () => {
     return ipcRenderer.invoke('privacy:isEncryptionAvailable');
   },

@@ -433,6 +433,9 @@ export function setupIpcHandlers(window: BrowserWindow): void {
         maxConnections: updated.maxConnections,
         maxConnectionsGlobal: updated.maxConnectionsGlobal,
         adaptiveUpload: updated.adaptiveUpload,
+        dohEnabled: updated.dohEnabled,
+        dohTemplateId: updated.dohTemplateId,
+        dohCustomTemplates: updated.dohCustomTemplates,
       });
 
       // Restart the disk-space guard if its settings changed
@@ -823,6 +826,39 @@ export function setupIpcHandlers(window: BrowserWindow): void {
   // Live adaptive-throttle / network-health snapshot for the Network settings panel.
   ipcMain.handle('network:getHealth', wrapHandler('network:getHealth',
     async () => torrentManager.getNetworkHealth()
+  ));
+
+  // DNS-over-HTTPS resolver templates (built-in + custom) for the Network panel.
+  ipcMain.handle('doh:getTemplates', wrapHandler('doh:getTemplates',
+    async () => {
+      const { getDohTemplates } = await import('../services/doh');
+      return getDohTemplates();
+    }
+  ));
+  ipcMain.handle('doh:addTemplate', wrapHandler('doh:addTemplate',
+    async (_event, name: string, url: string) => {
+      const { addDohTemplate } = await import('../services/doh');
+      const tpl = await addDohTemplate(name, url);
+      // A new custom resolver may be (or become) the active one — re-apply live.
+      const s = await db.getSettings();
+      await torrentManager.updateSettings({ dohCustomTemplates: s.dohCustomTemplates });
+      return tpl;
+    }
+  ));
+  ipcMain.handle('doh:deleteTemplate', wrapHandler('doh:deleteTemplate',
+    async (_event, id: string) => {
+      const { deleteDohTemplate } = await import('../services/doh');
+      const res = await deleteDohTemplate(id);
+      const s = await db.getSettings();
+      await torrentManager.updateSettings({ dohTemplateId: s.dohTemplateId, dohCustomTemplates: s.dohCustomTemplates });
+      return res;
+    }
+  ));
+  ipcMain.handle('doh:test', wrapHandler('doh:test',
+    async (_event, url: string) => {
+      const { testDohResolver } = await import('../services/doh');
+      return testDohResolver(url);
+    }
   ));
 
   ipcMain.handle('privacy:showVPNWarning', wrapHandler('privacy:showVPNWarning',
