@@ -134,10 +134,18 @@
 
 .room-conn { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 500; }
 .room-conn .dot { width: 8px; height: 8px; border-radius: 50%; }
-.room-conn.on { color: #22c55e; }
-.room-conn.on .dot { background: #22c55e; box-shadow: 0 0 8px rgba(34, 197, 94, 0.6); }
-.room-conn.off { color: var(--color-text-tertiary); }
-.room-conn.off .dot { background: var(--color-text-tertiary); animation: room-pulse 1.4s ease-in-out infinite; }
+/* online: peers present (green) */
+.room-conn.online { color: #22c55e; }
+.room-conn.online .dot { background: #22c55e; box-shadow: 0 0 8px rgba(34, 197, 94, 0.6); }
+/* alone: connected but no other members online yet (amber, steady) */
+.room-conn.alone { color: #f59e0b; }
+.room-conn.alone .dot { background: #f59e0b; box-shadow: 0 0 8px rgba(245, 158, 11, 0.5); }
+/* connecting: tracker not yet announced (grey, pulsing) */
+.room-conn.connecting { color: var(--color-text-tertiary); }
+.room-conn.connecting .dot { background: var(--color-text-tertiary); animation: room-pulse 1.4s ease-in-out infinite; }
+/* removed: we were kicked (red) */
+.room-conn.removed { color: #ef4444; }
+.room-conn.removed .dot { background: #ef4444; }
 
 @keyframes room-pulse { 0%, 100% { opacity: 0.4; } 50% { opacity: 1; } }
 

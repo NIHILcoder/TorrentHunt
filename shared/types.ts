@@ -124,7 +124,7 @@ export interface RoomMember {
 export interface RoomEvent {
   id: string;
   at: number;
-  type: 'created' | 'joined' | 'file-added' | 'file-removed' | 'kicked' | 'rekeyed';
+  type: 'created' | 'joined' | 'left' | 'file-added' | 'file-removed' | 'kicked' | 'rekeyed';
   actorId: string;       // who did it (memberId), '' if unknown
   actorName: string;
   fileName?: string;     // for file-added / file-removed

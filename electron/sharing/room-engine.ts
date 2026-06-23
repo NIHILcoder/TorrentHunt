@@ -68,6 +68,9 @@ type Msg =
   // which they can still read) right before the room rotates away from them, so
   // they get a clear "you were removed" instead of silently going stale.
   | { t: 'kicked'; targetId: string; by: string; byName: string }
+  // Sent when a member leaves voluntarily so peers drop them at once instead of
+  // keeping a 45s offline ghost in the list.
+  | { t: 'bye'; memberId: string }
   // Watch-together: relayed verbatim to peers; the renderers keep playback in sync
   // and show who's in the session ('join'/'leave'/'beat' presence).
   | { t: 'sync'; fileId: string; action: 'play' | 'pause' | 'seek' | 'state' | 'join' | 'leave' | 'beat'; position: number; rate: number; at: number; memberId: string; name: string; avatarSeed: string; playing: boolean };
@@ -383,6 +386,19 @@ function onMessage(room: Room, wire: Wire, raw: any): void {
       // (came in under the room key we still hold). Only act if WE are the target.
       if (msg.targetId !== room.self.memberId) break;
       markKicked(room, msg.byName || '?');
+      break;
+    }
+    case 'bye': {
+      // A member left voluntarily — drop them immediately (no offline ghost).
+      const m = room.members.get(msg.memberId);
+      if (m) {
+        room.members.delete(msg.memberId);
+        logEvent(room, { type: 'left', actorId: msg.memberId, actorName: m.name || '?' });
+      }
+      for (const w of Array.from(room.wires.values())) {
+        if (w.memberId === msg.memberId) { try { w.peer.destroy(); } catch { /* ignore */ } room.wires.delete(w.id); }
+      }
+      pushState(room, true);
       break;
     }
     case 'sync': {
@@ -864,16 +880,22 @@ async function addFiles(roomId: string, paths: string[]): Promise<RoomState> {
 function leaveRoom(roomId: string): void {
   const room = rooms.get(roomId);
   if (!room) return;
+  // Tell peers we're leaving so they drop us at once (no 45s offline ghost).
+  broadcast(room, { t: 'bye', memberId: room.self.memberId });
   rooms.delete(roomId);
-  try { room.tracker?.stop(); room.tracker?.destroy(); } catch { /* ignore */ }
-  for (const wire of room.wires.values()) { try { wire.peer.destroy(); } catch { /* ignore */ } }
-  // Stop transferring this room's torrents (only if no other room uses them).
-  if (client) {
-    for (const fileId of room.files.keys()) {
-      const stillUsed = Array.from(rooms.values()).some((r) => r.files.has(fileId));
-      if (!stillUsed) { const t = client.get(fileId); if (t) { try { client.remove(t); } catch { /* ignore */ } } }
+  const teardown = (): void => {
+    try { room.tracker?.stop(); room.tracker?.destroy(); } catch { /* ignore */ }
+    for (const wire of room.wires.values()) { try { wire.peer.destroy(); } catch { /* ignore */ } }
+    // Stop transferring this room's torrents (only if no other room uses them).
+    if (client) {
+      for (const fileId of room.files.keys()) {
+        const stillUsed = Array.from(rooms.values()).some((r) => r.files.has(fileId));
+        if (!stillUsed) { const t = client.get(fileId); if (t) { try { client.remove(t); } catch { /* ignore */ } } }
+      }
     }
-  }
+  };
+  // Defer the teardown briefly so the 'bye' flushes on the data channels first.
+  setTimeout(teardown, 200);
 }
 
 /**

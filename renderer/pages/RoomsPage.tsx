@@ -30,6 +30,7 @@ function eventText(t: RoomsTFn, ev: import('../../shared/types').RoomEvent): str
   switch (ev.type) {
     case 'created': return t('rooms.ev.created');
     case 'joined': return t('rooms.ev.joined');
+    case 'left': return t('rooms.ev.left');
     case 'file-added': return `${t('rooms.ev.fileAdded')} ${ev.fileName || ''}`.trim();
     case 'file-removed': return `${t('rooms.ev.fileRemoved')} ${ev.fileName || ''}`.trim();
     case 'kicked': return `${t('rooms.ev.kicked')} ${ev.targetName || ''}`.trim();
@@ -368,6 +369,15 @@ interface DetailProps {
 const RoomDetail: React.FC<DetailProps> = ({ room, onAddFiles, onOpenFolder, onInvite, onLeave, onCopyCode, onWatch, busy }) => {
   const { t } = useTranslation();
   const totalMembers = room.members.length;
+  // Connection indicator: removed → connecting → online (peers) → alone (no peers).
+  const connState = room.kicked ? 'removed' : !room.connected ? 'connecting' : room.peerCount > 0 ? 'online' : 'alone';
+  const connLabel = room.kicked
+    ? t('rooms.removed')
+    : !room.connected
+      ? t('rooms.connecting')
+      : room.peerCount > 0
+        ? `${t('rooms.connected')} · ${room.peerCount}`
+        : t('rooms.alone');
   return (
     <div className="room-detail-inner">
       {/* Title bar */}
@@ -379,9 +389,9 @@ const RoomDetail: React.FC<DetailProps> = ({ room, onAddFiles, onOpenFolder, onI
               <Icon name="lock" size={12} /> {t('rooms.encrypted')}
             </span>
           )}
-          <span className={`room-conn ${room.connected ? 'on' : 'off'}`}>
+          <span className={`room-conn ${connState}`}>
             <span className="dot" />
-            {room.connected ? `${t('rooms.connected')} · ${room.peerCount}` : t('rooms.connecting')}
+            {connLabel}
           </span>
         </div>
         <div className="room-detail-actions">
