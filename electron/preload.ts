@@ -247,6 +247,24 @@ const api: IpcApi = {
     return ipcRenderer.invoke('doh:test', url);
   },
 
+  getCurrentNetwork: () => {
+    return ipcRenderer.invoke('netprofiles:current');
+  },
+  getNetworkProfiles: () => {
+    return ipcRenderer.invoke('netprofiles:list');
+  },
+  saveNetworkProfile: (profile: import('../shared/types').NetworkProfile) => {
+    return ipcRenderer.invoke('netprofiles:save', profile);
+  },
+  deleteNetworkProfile: (id: string) => {
+    return ipcRenderer.invoke('netprofiles:delete', id);
+  },
+  onNetworkProfile: (callback: (payload: { current: import('../shared/types').NetworkInfo; activeId: string | null }) => void) => {
+    const listener = (_e: unknown, payload: { current: import('../shared/types').NetworkInfo; activeId: string | null }) => callback(payload);
+    ipcRenderer.on('network:profileChanged', listener);
+    return () => ipcRenderer.removeListener('network:profileChanged', listener);
+  },
+
   isEncryptionAvailable: () => {
     return ipcRenderer.invoke('privacy:isEncryptionAvailable');
   },

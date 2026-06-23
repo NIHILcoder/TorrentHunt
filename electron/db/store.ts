@@ -19,7 +19,7 @@
  */
 
 import Store from 'electron-store';
-import { Download, AppSettings, SourceType, Category, SchedulerConfig, UserReputation, ReputationTransaction, PrivacyConfig, RSSFeed, RSSItem, SearchProvider, IPBlocklist, RoomProfile, PersistedRoomFile, RoomEvent } from '../../shared/types';
+import { Download, AppSettings, SourceType, Category, SchedulerConfig, UserReputation, ReputationTransaction, PrivacyConfig, RSSFeed, RSSItem, SearchProvider, IPBlocklist, RoomProfile, PersistedRoomFile, RoomEvent, NetworkProfile } from '../../shared/types';
 import { v4 as uuidv4 } from 'uuid';
 import { app } from 'electron';
 import path from 'path';
@@ -39,6 +39,7 @@ interface ConfigSchema {
   collaborativeSeedingEnabled: boolean;  // Collaborative Seeding Network opt-in (persisted)
   trayHintShown?: boolean;               // One-time "running in tray" hint (set from main.ts)
   splitStoresMigrated?: boolean;         // One-time migration marker (see migrateToSplitStores)
+  networkProfiles?: NetworkProfile[];    // Smart per-network settings overlays
 }
 
 interface DownloadsSchema {
@@ -134,6 +135,7 @@ const configStore = new Store<ConfigSchema>({
       dohEnabled: false,
       dohTemplateId: 'cloudflare',
       dohCustomTemplates: [],
+      networkProfilesEnabled: false,
       // Proxy
       proxyEnabled: false,
       proxyType: 'http' as const,
@@ -1109,6 +1111,21 @@ export function updateRoomProfile(updates: Partial<Pick<RoomProfile, 'name' | 'a
   const next: RoomProfile = { ...profile, ...updates };
   roomsStore.set('roomProfile', next);
   return next;
+}
+
+// === Smart network profiles ===
+export function getNetworkProfiles(): NetworkProfile[] {
+  return configStore.get('networkProfiles') ?? [];
+}
+export function saveNetworkProfile(profile: NetworkProfile): NetworkProfile {
+  const list = getNetworkProfiles();
+  const idx = list.findIndex((p) => p.id === profile.id);
+  if (idx >= 0) list[idx] = profile; else list.push(profile);
+  configStore.set('networkProfiles', list);
+  return profile;
+}
+export function deleteNetworkProfile(id: string): void {
+  configStore.set('networkProfiles', getNetworkProfiles().filter((p) => p.id !== id));
 }
 
 // Export the config store as `store` for the few main-process callers that read

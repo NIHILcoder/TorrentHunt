@@ -7,6 +7,14 @@ This project follows [Keep a Changelog](https://keepachangelog.com/) and
 ## [Unreleased]
 
 ### Added
+- **Smart network profiles.** Opt-in (Settings → Network → Smart network profiles):
+  TorrentHunt detects which network you're on — keyed by the router (gateway MAC,
+  so it works on Wi-Fi *and* Ethernet) — and automatically applies that network's
+  settings overlay: speed limits, connection cap, adaptive throttle, DoH. e.g.
+  "Home → full speed; phone hotspot → 200 KB/s + DoH on". The overlay is live and
+  non-destructive — leaving the network restores your base settings. Save the
+  current network as a profile in one click, then tick which settings to override.
+  No mainstream client does per-network automation.
 - **DNS-over-HTTPS for the torrent engine.** Opt-in (Settings → Network →
   DNS-over-HTTPS): resolve tracker/peer hostnames through an encrypted DoH
   resolver instead of the OS/router DNS. Survives a broken or overloaded router

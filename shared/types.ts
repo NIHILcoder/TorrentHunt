@@ -257,6 +257,36 @@ export function resolveActiveDohUrl(
   return all.find((t) => t.id === s.dohTemplateId)?.url || '';
 }
 
+/** A per-network settings overlay. Only the fields set here override the user's
+ *  base settings while the matching network is active; everything else falls back
+ *  to the base. All overrides apply live (no restart). */
+export interface NetworkProfileOverrides {
+  maxDownKbps?: number;            // 0 = unlimited
+  maxUpKbps?: number;              // 0 = unlimited
+  maxConnectionsGlobal?: number;
+  adaptiveUpload?: boolean;
+  dohEnabled?: boolean;
+}
+
+/** A named network profile. Matched to a network by `networkKey` (the default
+ *  gateway's MAC — stable across reconnects, works wired + wireless). */
+export interface NetworkProfile {
+  id: string;
+  name: string;
+  networkKey: string;              // normalized gateway MAC; '' = not bound to a network yet
+  networkLabel?: string;           // friendly last-seen name (SSID / connection name)
+  overrides: NetworkProfileOverrides;
+}
+
+/** The network the machine is currently on. */
+export interface NetworkInfo {
+  key: string;                     // normalized gateway MAC ('' when undetectable)
+  label: string;                   // SSID / connection name / interface
+  gatewayIp?: string;
+  ssid?: string;
+  iface?: string;
+}
+
 export interface AppSettings {
   id: number;
   defaultDownloadDir: string;
@@ -298,6 +328,10 @@ export interface AppSettings {
   dohEnabled: boolean;
   dohTemplateId: string;
   dohCustomTemplates: DohTemplate[];
+  // Smart network profiles: auto-apply a settings overlay (limits / adaptive /
+  // DoH) based on which network you're on, keyed by the gateway MAC. Off by
+  // default; the profile list lives in networkProfiles (a separate store key).
+  networkProfilesEnabled: boolean;
   // Proxy settings
   proxyEnabled: boolean;
   proxyType: 'http' | 'https' | 'socks5';
@@ -733,6 +767,12 @@ export interface IpcApi {
   addDohTemplate: (name: string, url: string) => Promise<DohTemplate>; // add a custom resolver
   deleteDohTemplate: (id: string) => Promise<{ ok: boolean }>;         // remove a custom resolver
   testDohResolver: (url: string) => Promise<{ ok: boolean; ms?: number; ip?: string; error?: string }>;
+  // Smart network profiles
+  getCurrentNetwork: () => Promise<NetworkInfo>;
+  getNetworkProfiles: () => Promise<{ profiles: NetworkProfile[]; activeId: string | null; current: NetworkInfo }>;
+  saveNetworkProfile: (profile: NetworkProfile) => Promise<NetworkProfile>;
+  deleteNetworkProfile: (id: string) => Promise<{ ok: boolean }>;
+  onNetworkProfile: (callback: (payload: { current: NetworkInfo; activeId: string | null }) => void) => () => void;
   isEncryptionAvailable: () => Promise<boolean>;
   clearAllData: () => Promise<{ success: boolean }>;
   openLogsFolder: () => Promise<{ ok: boolean }>;

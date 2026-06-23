@@ -501,6 +501,16 @@ async function initializeApp(): Promise<void> {
     logger.error('App', 'Failed to init VPN guard', { error: e });
   }
 
+  // Start the smart network-profile monitor (applies base settings unless enabled)
+  try {
+    if (mainWindow) {
+      const { startNetworkProfiles } = await import('./services/network-profiles');
+      startNetworkProfiles(mainWindow);
+    }
+  } catch (e) {
+    logger.error('App', 'Failed to start network profiles', { error: e });
+  }
+
   // Start the disk-space guard (auto-pauses torrents when free space is low)
   try {
     if (mainWindow) {

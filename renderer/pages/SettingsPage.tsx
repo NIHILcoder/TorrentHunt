@@ -5,7 +5,7 @@
  */
 
 import React, { useState, useEffect } from 'react';
-import { AppSettings, SchedulerConfig, ScheduleEntry, PortForwardStatus, NetworkHealth, DohTemplate } from '../../shared/types';
+import { AppSettings, SchedulerConfig, ScheduleEntry, PortForwardStatus, NetworkHealth, DohTemplate, NetworkProfile, NetworkInfo } from '../../shared/types';
 import {
   Button,
   Icon,
@@ -73,6 +73,12 @@ const SettingsPage: React.FC = () => {
   const [dohNewUrl, setDohNewUrl] = useState('');
   const [dohAdding, setDohAdding] = useState(false);
   const [dohTest, setDohTest] = useState<{ id: string; state: 'testing' | 'ok' | 'err'; text: string } | null>(null);
+  // Smart network profiles
+  const [netEnabled, setNetEnabled] = useState(false);
+  const [netProfiles, setNetProfiles] = useState<NetworkProfile[]>([]);
+  const [netCurrent, setNetCurrent] = useState<NetworkInfo | null>(null);
+  const [netActiveId, setNetActiveId] = useState<string | null>(null);
+  const [netDraft, setNetDraft] = useState<NetworkProfile | null>(null);
   const [maxActiveDownloads, setMaxActiveDownloads] = useState(3);
   // Alternative ("turbo") speed limits
   const [altSpeedEnabled, setAltSpeedEnabled] = useState(false);
@@ -232,6 +238,12 @@ const SettingsPage: React.FC = () => {
     return () => { alive = false; clearInterval(iv); };
   }, [activeCategory, adaptiveUpload]);
 
+  // Live network/profile changes pushed from the monitor.
+  useEffect(() => {
+    const off = window.api.onNetworkProfile((p) => { setNetCurrent(p.current); setNetActiveId(p.activeId); });
+    return off;
+  }, []);
+
   // Track unsaved changes across ALL persisted fields (not just a handful),
   // so the Save bar appears whenever anything actually changed.
   useEffect(() => {
@@ -292,6 +304,10 @@ const SettingsPage: React.FC = () => {
       setDohEnabled(s.dohEnabled ?? false);
       setDohTemplateId(s.dohTemplateId ?? 'cloudflare');
       window.api.getDohTemplates().then(setDohTemplates).catch(() => {});
+      setNetEnabled(s.networkProfilesEnabled ?? false);
+      window.api.getNetworkProfiles().then((r) => {
+        setNetProfiles(r.profiles); setNetActiveId(r.activeId); setNetCurrent(r.current);
+      }).catch(() => {});
       setMaxActiveDownloads(s.maxActiveDownloads);
       setAltSpeedEnabled(s.altSpeedEnabled ?? false);
       setAltDownKbps(s.altDownKbps ?? 0);
@@ -465,6 +481,49 @@ const SettingsPage: React.FC = () => {
       if (r.ok) setDohTest({ id: tpl.id, state: 'ok', text: `${r.ms} ms · ${r.ip}` });
       else setDohTest({ id: tpl.id, state: 'err', text: r.error || t('settings.doh.testFail') });
     } catch (e) { setDohTest({ id: tpl.id, state: 'err', text: String(e instanceof Error ? e.message : e) }); }
+  };
+
+  // ── Smart network profiles ───────────────────────────────────────────────
+  const refreshNetProfiles = async () => {
+    try { const r = await window.api.getNetworkProfiles(); setNetProfiles(r.profiles); setNetActiveId(r.activeId); setNetCurrent(r.current); }
+    catch (e) { console.error(e); }
+  };
+
+  const saveCurrentAsProfile = async () => {
+    if (!netCurrent?.key) { setMessage({ type: 'error', text: t('settings.net.noNetwork') }); return; }
+    if (netProfiles.some((p) => p.networkKey === netCurrent.key)) { setMessage({ type: 'error', text: t('settings.net.alreadyHas') }); return; }
+    const draft: NetworkProfile = { id: '', name: netCurrent.label || 'Network', networkKey: netCurrent.key, networkLabel: netCurrent.label, overrides: {} };
+    setNetDraft(draft);
+  };
+
+  const saveNetDraft = async () => {
+    if (!netDraft) return;
+    try { await window.api.saveNetworkProfile(netDraft); setNetDraft(null); await refreshNetProfiles(); setMessage({ type: 'success', text: t('settings.net.saved') }); }
+    catch (e) { setMessage({ type: 'error', text: String(e instanceof Error ? e.message : e) }); }
+  };
+
+  const removeNetProfile = async (id: string) => {
+    try { await window.api.deleteNetworkProfile(id); if (netDraft?.id === id) setNetDraft(null); await refreshNetProfiles(); }
+    catch (e) { setMessage({ type: 'error', text: String(e instanceof Error ? e.message : e) }); }
+  };
+
+  // Toggle a single override on/off in the draft (on = seed with a sensible value).
+  const toggleOverride = (key: keyof NetworkProfile['overrides'], on: boolean) => {
+    setNetDraft((d) => {
+      if (!d) return d;
+      const overrides = { ...d.overrides };
+      if (!on) { delete overrides[key]; }
+      else {
+        const seed = key === 'adaptiveUpload' || key === 'dohEnabled' ? true
+          : key === 'maxConnectionsGlobal' ? 100
+          : key === 'maxUpKbps' ? 200 : 0;
+        (overrides as Record<string, number | boolean>)[key] = seed;
+      }
+      return { ...d, overrides };
+    });
+  };
+  const setOverrideValue = (key: keyof NetworkProfile['overrides'], value: number | boolean) => {
+    setNetDraft((d) => (d ? { ...d, overrides: { ...d.overrides, [key]: value } } : d));
   };
 
   // Watch-folder toggles need the live path + both flags pushed to the watcher.
@@ -1011,6 +1070,11 @@ const SettingsPage: React.FC = () => {
 
         <div className="settings-divider" />
 
+        {/* Smart network profiles */}
+        {renderNetworkProfilesSection()}
+
+        <div className="settings-divider" />
+
         {/* Alternative ("turbo"/turtle) speed limits */}
         <div className="settings-group">
           <h3 className="settings-group-title">{t('settings.grp.altSpeed')}</h3>
@@ -1359,6 +1423,125 @@ const SettingsPage: React.FC = () => {
           <Icon name="info" size={14} />
           <span>{t('settings.doh.note')}</span>
         </div>
+      </div>
+    );
+  }
+
+  // Smart network profiles: auto-apply a settings overlay per network.
+  function renderNetworkProfilesSection() {
+    const overrideSummary = (p: NetworkProfile): string => {
+      const o = p.overrides; const parts: string[] = [];
+      if (o.maxDownKbps !== undefined) parts.push(`↓ ${o.maxDownKbps || '∞'}`);
+      if (o.maxUpKbps !== undefined) parts.push(`↑ ${o.maxUpKbps || '∞'}`);
+      if (o.maxConnectionsGlobal !== undefined) parts.push(`${o.maxConnectionsGlobal} conn`);
+      if (o.adaptiveUpload !== undefined) parts.push(`adaptive ${o.adaptiveUpload ? 'on' : 'off'}`);
+      if (o.dohEnabled !== undefined) parts.push(`DoH ${o.dohEnabled ? 'on' : 'off'}`);
+      return parts.length ? parts.join(' · ') : t('settings.net.noOverrides');
+    };
+
+    const numRow = (key: 'maxDownKbps' | 'maxUpKbps' | 'maxConnectionsGlobal', label: string, unit: string) => {
+      const o = netDraft!.overrides; const on = o[key] !== undefined;
+      return (
+        <div className="np-ovr">
+          <label className="np-ovr-toggle">
+            <input type="checkbox" checked={on} onChange={(e) => toggleOverride(key, e.target.checked)} /> {label}
+          </label>
+          {on && (
+            <div className="speed-input-compact">
+              <input type="number" className="input-compact input-mono" min="0" value={o[key] as number}
+                onChange={(e) => setOverrideValue(key, parseInt(e.target.value) || 0)} />
+              {unit && <span className="input-unit">{unit}</span>}
+            </div>
+          )}
+        </div>
+      );
+    };
+    const boolRow = (key: 'adaptiveUpload' | 'dohEnabled', label: string) => {
+      const o = netDraft!.overrides; const on = o[key] !== undefined;
+      return (
+        <div className="np-ovr">
+          <label className="np-ovr-toggle">
+            <input type="checkbox" checked={on} onChange={(e) => toggleOverride(key, e.target.checked)} /> {label}
+          </label>
+          {on && renderToggle(!!o[key], () => setOverrideValue(key, !o[key]))}
+        </div>
+      );
+    };
+
+    const editor = () => (
+      <div className="np-editor">
+        <input className="input-compact np-name" value={netDraft!.name}
+          onChange={(e) => setNetDraft((d) => (d ? { ...d, name: e.target.value } : d))}
+          placeholder={t('settings.net.namePlaceholder')} />
+        <div className="np-bound">{t('settings.net.boundTo')}: <strong>{netDraft!.networkLabel || netDraft!.networkKey || '—'}</strong></div>
+        {numRow('maxDownKbps', t('settings.downSpeed'), 'KB/s')}
+        {numRow('maxUpKbps', t('settings.upSpeed'), 'KB/s')}
+        {numRow('maxConnectionsGlobal', t('settings.maxConnGlobal'), '')}
+        {boolRow('adaptiveUpload', t('settings.adaptiveUpload'))}
+        {boolRow('dohEnabled', t('settings.doh'))}
+        <div className="np-editor-actions">
+          <Button variant="ghost" size="sm" onClick={() => setNetDraft(null)}>{t('common.cancel')}</Button>
+          <Button variant="primary" size="sm" onClick={saveNetDraft}>{t('common.save')}</Button>
+        </div>
+      </div>
+    );
+
+    return (
+      <div className="settings-group">
+        <h3 className="settings-group-title">{t('settings.grp.netProfiles')}</h3>
+        {renderSettingItem(
+          t('settings.net'),
+          t('settings.net.desc'),
+          renderToggle(netEnabled, () => applyToggle(!netEnabled, setNetEnabled, { networkProfilesEnabled: !netEnabled }))
+        )}
+
+        {netEnabled && (
+          <div className="np-panel">
+            <div className="np-current">
+              <Icon name="network" size={16} />
+              <div className="np-current-info">
+                <div className="np-current-label">{netCurrent?.label || t('settings.net.detecting')}</div>
+                <div className="np-current-sub">
+                  {netCurrent?.key
+                    ? (netActiveId ? `${t('settings.net.active')}: ${netProfiles.find((p) => p.id === netActiveId)?.name || ''}` : t('settings.net.baseActive'))
+                    : t('settings.net.undetectable')}
+                </div>
+              </div>
+              <Button variant="secondary" size="sm" onClick={saveCurrentAsProfile}
+                disabled={!netCurrent?.key || netProfiles.some((p) => p.networkKey === netCurrent?.key)}
+                icon={<Icon name="plus" size={14} />}>
+                {t('settings.net.saveCurrent')}
+              </Button>
+            </div>
+
+            {netProfiles.length === 0 && !netDraft ? (
+              <div className="np-empty">{t('settings.net.empty')}</div>
+            ) : (
+              <div className="np-list">
+                {netProfiles.map((p) => {
+                  const isCurrent = !!netCurrent?.key && p.networkKey === netCurrent.key;
+                  const isActive = p.id === netActiveId;
+                  return (
+                    <div key={p.id} className={`np-item ${isActive ? 'active' : ''}`}>
+                      <div className="np-item-head">
+                        <span className="np-item-name">{p.name}{isCurrent && <span className="np-here">{t('settings.net.here')}</span>}</span>
+                        <span className="np-item-summary">{overrideSummary(p)}</span>
+                        <div className="np-item-actions">
+                          <button className="doh-mini-btn" onClick={() => setNetDraft(netDraft?.id === p.id ? null : { ...p })} title={t('common.edit')}><Icon name="settings" size={13} /></button>
+                          <button className="doh-mini-btn danger" onClick={() => removeNetProfile(p.id)} title={t('settings.doh.delete')}><Icon name="trash" size={13} /></button>
+                        </div>
+                      </div>
+                      {netDraft?.id === p.id && editor()}
+                    </div>
+                  );
+                })}
+                {netDraft && !netDraft.id && <div className="np-item active">{editor()}</div>}
+              </div>
+            )}
+
+            <div className="settings-notice-compact"><Icon name="info" size={14} /><span>{t('settings.net.note')}</span></div>
+          </div>
+        )}
       </div>
     );
   }

@@ -452,6 +452,11 @@ export function setupIpcHandlers(window: BrowserWindow): void {
         await restartPortForwardingFromConfig(() => torrentManager.getListeningPort());
       }
 
+      // Re-apply the active network-profile overlay so a manual base-setting change
+      // (or toggling the feature) doesn't clobber the per-network override.
+      const { applyForCurrentNetwork } = await import('../services/network-profiles');
+      void applyForCurrentNetwork(true);
+
       return updated;
     }
   ));
@@ -858,6 +863,32 @@ export function setupIpcHandlers(window: BrowserWindow): void {
     async (_event, url: string) => {
       const { testDohResolver } = await import('../services/doh');
       return testDohResolver(url);
+    }
+  ));
+
+  // Smart network profiles
+  ipcMain.handle('netprofiles:current', wrapHandler('netprofiles:current',
+    async () => {
+      const { detectNetwork } = await import('../services/network-profiles');
+      return detectNetwork();
+    }
+  ));
+  ipcMain.handle('netprofiles:list', wrapHandler('netprofiles:list',
+    async () => {
+      const { getProfilesState } = await import('../services/network-profiles');
+      return getProfilesState();
+    }
+  ));
+  ipcMain.handle('netprofiles:save', wrapHandler('netprofiles:save',
+    async (_event, profile: import('../../shared/types').NetworkProfile) => {
+      const { saveProfile } = await import('../services/network-profiles');
+      return saveProfile(profile);
+    }
+  ));
+  ipcMain.handle('netprofiles:delete', wrapHandler('netprofiles:delete',
+    async (_event, id: string) => {
+      const { deleteProfile } = await import('../services/network-profiles');
+      return deleteProfile(id);
     }
   ));
 
