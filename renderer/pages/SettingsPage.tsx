@@ -94,6 +94,7 @@ const SettingsPage: React.FC = () => {
   // Advanced settings (proxy UI removed — WebTorrent has no proxy support;
   // PEX/LSD toggles removed — not switchable/implemented in WebTorrent)
   const [enableDHT, setEnableDHT] = useState(true);
+  const [enableUtp, setEnableUtp] = useState(false);
   const [maxConnections, setMaxConnections] = useState(55);
   const [maxConnectionsGlobal, setMaxConnectionsGlobal] = useState(200);
   const [portMin, setPortMin] = useState(6881);
@@ -319,6 +320,7 @@ const SettingsPage: React.FC = () => {
 
       // Advanced settings
       setEnableDHT(s.enableDHT ?? true);
+      setEnableUtp(s.enableUtp ?? false);
       setMaxConnections(s.maxConnections ?? 55);
       setMaxConnectionsGlobal(s.maxConnectionsGlobal ?? 200);
       setPortMin(s.portMin ?? 6881);
@@ -1191,6 +1193,11 @@ const SettingsPage: React.FC = () => {
             t('settings.dht'),
             t('settings.dht.desc'),
             renderToggle(enableDHT, () => applyToggle(!enableDHT, setEnableDHT, { enableDHT: !enableDHT }))
+          )}
+          {renderSettingItem(
+            t('settings.utp'),
+            t('settings.utp.desc'),
+            renderToggle(enableUtp, () => applyToggle(!enableUtp, setEnableUtp, { enableUtp: !enableUtp }))
           )}
           {/* PEX/LSD toggles removed: WebTorrent can't switch PEX off and has
               no LSD implementation — the switches were placebo. */}

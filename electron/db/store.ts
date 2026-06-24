@@ -126,8 +126,10 @@ const configStore = new Store<ConfigSchema>({
       enableDHT: true,
       enablePEX: true,
       enableLSD: true,
-      maxConnections: 55,
-      maxConnectionsGlobal: 200,
+      // µTP experimental: default on except Windows (historic utp-native crash).
+      enableUtp: process.platform !== 'win32',
+      maxConnections: 100,
+      maxConnectionsGlobal: 300,
       portMin: 6881,
       portMax: 6889,
       portForwarding: true,
@@ -926,15 +928,19 @@ export async function markRSSItemDownloaded(guid: string): Promise<void> {
 
 export async function getSearchProviders(): Promise<SearchProvider[]> {
   const providers = searchStore.get('searchProviders') ?? [];
-  // Decrypt API keys transparently for callers (search service, UI)
-  return providers.map(p => ({ ...p, apiKey: p.apiKey ? decryptSecret(p.apiKey) : p.apiKey }));
+  // Decrypt secrets (API key + login password) transparently for callers.
+  return providers.map(p => ({
+    ...p,
+    apiKey: p.apiKey ? decryptSecret(p.apiKey) : p.apiKey,
+    password: p.password ? decryptSecret(p.password) : p.password,
+  }));
 }
 
 export async function addSearchProvider(provider: Omit<SearchProvider, 'id'>): Promise<SearchProvider> {
   const providers = searchStore.get('searchProviders') ?? [];
   const newProvider: SearchProvider = { ...provider, id: uuidv4() };
-  // Encrypt the API key at rest
-  const stored = { ...newProvider, apiKey: encryptSecret(newProvider.apiKey) };
+  // Encrypt secrets at rest (API key + login password).
+  const stored = { ...newProvider, apiKey: encryptSecret(newProvider.apiKey), password: encryptSecret(newProvider.password) };
   providers.push(stored);
   searchStore.set('searchProviders', providers);
   return newProvider; // return plaintext view
@@ -945,12 +951,15 @@ export async function updateSearchProvider(id: string, updates: Partial<SearchPr
   const idx = providers.findIndex((p: SearchProvider) => p.id === id);
   if (idx === -1) throw new Error(`Search provider not found: ${id}`);
   const merged = { ...providers[idx], ...updates };
-  if (updates.apiKey !== undefined) {
-    merged.apiKey = encryptSecret(updates.apiKey);
-  }
+  if (updates.apiKey !== undefined) merged.apiKey = encryptSecret(updates.apiKey);
+  if (updates.password !== undefined) merged.password = encryptSecret(updates.password);
   providers[idx] = merged;
   searchStore.set('searchProviders', providers);
-  return { ...merged, apiKey: merged.apiKey ? decryptSecret(merged.apiKey) : merged.apiKey };
+  return {
+    ...merged,
+    apiKey: merged.apiKey ? decryptSecret(merged.apiKey) : merged.apiKey,
+    password: merged.password ? decryptSecret(merged.password) : merged.password,
+  };
 }
 
 export async function removeSearchProvider(id: string): Promise<void> {

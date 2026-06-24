@@ -306,6 +306,10 @@ export interface AppSettings {
   enableDHT: boolean;
   enablePEX: boolean;
   enableLSD: boolean;
+  // µTP transport (experimental). Reaches µTP-only peers TCP misses. Default is
+  // platform-based (off on Windows, on elsewhere) due to a historic native-module
+  // crash on Windows; takes effect after a restart (set at engine creation).
+  enableUtp: boolean;
   maxConnections: number;          // per-torrent connection ceiling
   // Global connection budget across ALL torrents. The effective per-torrent limit
   // is scaled down as more torrents run so the total never exceeds this — prevents
@@ -615,6 +619,11 @@ export interface SearchProvider {
   name: string;
   url: string;                  // Jackett base URL or custom API URL (for 'script': absolute script path)
   apiKey?: string;
+  // Optional login for auth'd indexers (e.g. a RuTracker script plugin). Stored
+  // encrypted at rest like apiKey; passed to script providers as TH_USERNAME /
+  // TH_PASSWORD env vars so the scraping stays in the (userland) plugin.
+  username?: string;
+  password?: string;
   enabled: boolean;
   type: 'jackett' | 'torznab' | 'custom' | 'archive' | 'script';
   builtIn?: boolean;            // Pre-seeded provider (e.g. Internet Archive) — not user-removable

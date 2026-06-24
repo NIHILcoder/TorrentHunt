@@ -36,6 +36,7 @@ import { spawn, ChildProcess } from 'child_process';
 import { AdaptiveThrottle } from './adaptive-throttle';
 import { installDohLookup, configureDoh } from './host/doh-lookup';
 import { resolveActiveDohUrl, DohTemplate } from '../../shared/types';
+import { DEFAULT_TRACKERS } from './trackers';
 
 // ffmpeg-static ships a platform binary; in a packaged app it lives in
 // app.asar.unpacked (it can't execute from inside the asar archive).
@@ -123,8 +124,12 @@ export class TorrentManager {
   // is the total budget across all live torrents. The effective per-torrent limit
   // (client.maxConns, read live by WebTorrent on every connect) is scaled down as
   // more torrents run so the total never exceeds the global budget.
-  private maxConnections = 55;
-  private maxConnectionsGlobal = 200;
+  // Per-torrent ceiling raised 55→100: a SINGLE active torrent was capped at 55
+  // peers, low for big swarms. Safe to raise now because the slow-start ramp +
+  // adaptive throttle (below) keep the router protected regardless, and the
+  // global budget still bounds the multi-torrent total.
+  private maxConnections = 100;
+  private maxConnectionsGlobal = 300;
   private static readonly MIN_CONNS_PER_TORRENT = 20;
   // Connection slow-start: after the client comes up we ramp the per-torrent
   // connection ceiling from a low floor to its full value over RAMP_DURATION_MS,
@@ -213,8 +218,8 @@ export class TorrentManager {
     this.autoMovePath = settings.autoMovePath ?? '';
     this.defaultSeedRatioLimit = settings.defaultSeedRatioLimit ?? 0;
     this.defaultSeedTimeLimitMinutes = settings.defaultSeedTimeLimitMinutes ?? 0;
-    this.maxConnections = settings.maxConnections > 0 ? settings.maxConnections : 55;
-    this.maxConnectionsGlobal = settings.maxConnectionsGlobal > 0 ? settings.maxConnectionsGlobal : 200;
+    this.maxConnections = settings.maxConnections > 0 ? settings.maxConnections : 100;
+    this.maxConnectionsGlobal = settings.maxConnectionsGlobal > 0 ? settings.maxConnectionsGlobal : 300;
     this.adaptiveUploadEnabled = settings.adaptiveUpload === true;
     this.dohEnabled = settings.dohEnabled === true;
     this.dohTemplateId = settings.dohTemplateId || 'cloudflare';
@@ -235,16 +240,26 @@ export class TorrentManager {
     // TorrentHunt client prefix (-TH<version>-) followed by random bytes that
     // rotate every launch, so peers can't correlate sessions long-term.
     //
-    // utp: false — disable µTP transport. The native utp-native module throws
-    // uncaught "no buffer space available" (WSAENOBUFS) errors on Windows under
-    // load, which crash the main process. Plain TCP is stable and universal.
+    // µTP transport reaches µTP-only peers that TCP misses, but the native
+    // utp-native module historically threw uncaught WSAENOBUFS on Windows under
+    // load. It's now an EXPERIMENTAL opt-in (Settings → Advanced), default OFF on
+    // Windows and ON elsewhere, and the engine runs in an auto-restarting utility
+    // process so a transient native crash is recovered, not fatal to the app.
     //
     // dht / maxConns / torrentPort / download+uploadLimit come from Settings →
     // Advanced. (PEX can't be toggled in WebTorrent; LSD isn't implemented.)
+    // µTP only engages if the optional native module is actually installed —
+    // otherwise stay TCP-only instead of risking a load error.
+    let enableUtp = settings.enableUtp ?? (process.platform !== 'win32');
+    if (enableUtp) {
+      try { require.resolve('utp-native'); }
+      catch { enableUtp = false; log.warn('µTP requested but utp-native is not installed — staying TCP-only'); }
+    }
+    log.info('Transport', { utp: enableUtp });
     this.configuredPort = settings.portMin > 0 ? settings.portMin : 0;
     this.client = new WebTorrent({
       peerId: this.generateEphemeralPeerId(),
-      utp: false,
+      utp: enableUtp,
       dht: settings.enableDHT !== false,
       // Start at the per-torrent ceiling; applyConnectionLimit() scales it down
       // live as more torrents go active (WebTorrent reads client.maxConns on every
@@ -1025,8 +1040,16 @@ export class TorrentManager {
       // Merge any user-added trackers into the announce list (webtorrent unions
       // them with the torrent's own trackers). User-removed ones are pruned from
       // the live client once it's built (see the 'ready' handler).
-      if (managed.download.customTrackers && managed.download.customTrackers.length > 0) {
-        addOptions.announce = managed.download.customTrackers;
+      const customTrackers = managed.download.customTrackers || [];
+      // For MAGNET sources (always public swarms) also union our curated default
+      // trackers, so a trackerless/thin magnet gets tracker-based peers instead of
+      // relying on DHT/PEX alone. NEVER for .torrent files — they may be from a
+      // PRIVATE tracker, where injecting public trackers can get the user banned.
+      const isMagnet = typeof source === 'string' && source.startsWith('magnet:');
+      if (isMagnet) {
+        addOptions.announce = Array.from(new Set([...customTrackers, ...DEFAULT_TRACKERS.flat()]));
+      } else if (customTrackers.length > 0) {
+        addOptions.announce = customTrackers;
       }
 
       // If selectedFiles is provided, configure file selection
@@ -1319,7 +1342,7 @@ export class TorrentManager {
    */
   private applyConnectionLimit(): void {
     if (!this.client) return;
-    const perTorrentCeiling = this.maxConnections > 0 ? this.maxConnections : 55;
+    const perTorrentCeiling = this.maxConnections > 0 ? this.maxConnections : 100;
     const globalCap = this.maxConnectionsGlobal > 0 ? this.maxConnectionsGlobal : perTorrentCeiling;
     const live = Math.max(1, this.liveTorrentCount());
     const target = Math.max(

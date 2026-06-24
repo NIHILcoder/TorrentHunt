@@ -269,6 +269,15 @@ export class SearchService {
     const args = [...py.baseArgs, scriptPath, query, category || ''];
     log.info('Running script provider', { name: provider.name, command: py.command });
 
+    // Pass the provider's (decrypted) credentials to the plugin via the
+    // environment so auth'd indexers (e.g. RuTracker) work while the actual
+    // scraping/login stays entirely in the userland .py — the core never logs in.
+    const credEnv: Record<string, string> = {};
+    if (provider.username) credEnv.TH_USERNAME = provider.username;
+    if (provider.password) credEnv.TH_PASSWORD = provider.password;
+    if (provider.apiKey) credEnv.TH_APIKEY = provider.apiKey;
+    if (provider.url) credEnv.TH_PROVIDER_URL = provider.url;
+
     const stdout = await new Promise<string>((resolve, reject) => {
       const child = execFile(
         py.command,
@@ -278,7 +287,7 @@ export class SearchService {
           maxBuffer: SCRIPT_MAX_BUFFER,
           windowsHide: true,
           cwd: path.dirname(scriptPath),
-          env: { ...process.env, PYTHONUNBUFFERED: '1', PYTHONIOENCODING: 'utf-8' },
+          env: { ...process.env, ...credEnv, PYTHONUNBUFFERED: '1', PYTHONIOENCODING: 'utf-8' },
         },
         (err, out, errOut) => {
           if (err) {

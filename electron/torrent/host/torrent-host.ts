@@ -23,6 +23,25 @@ function post(msg: FromHost): void {
   try { port.postMessage(msg); } catch { /* main gone */ }
 }
 
+// The experimental µTP transport (and other native socket ops) can emit transient
+// errors under load — notably WSAENOBUFS/ENOBUFS/EMFILE on Windows. Those used to
+// crash the MAIN process; now they surface here in the isolated host. Swallow the
+// transient ones so µTP doesn't tear the engine down; anything else is logged and
+// the host exits cleanly so the proxy respawns it (crash recovery).
+process.on('uncaughtException', (err: NodeJS.ErrnoException) => {
+  const code = err?.code || '';
+  const transient = /ENOBUFS|EMFILE|ECONNRESET|EPIPE/i.test(code) || /no buffer space/i.test(err?.message || '');
+  if (transient) {
+    console.error('[host] swallowed transient socket error:', code || err?.message);
+    return;
+  }
+  console.error('[host] fatal uncaughtException:', err?.stack || err?.message);
+  process.exit(1);
+});
+process.on('unhandledRejection', (reason) => {
+  console.error('[host] unhandledRejection:', reason instanceof Error ? reason.stack : String(reason));
+});
+
 let manager: TorrentManager | null = null;
 
 // cast* method names are served by the cast server, not the manager.

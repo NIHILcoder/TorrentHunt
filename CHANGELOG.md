@@ -7,6 +7,21 @@ This project follows [Keep a Changelog](https://keepachangelog.com/) and
 ## [Unreleased]
 
 ### Added
+- **RuTracker search (via a bundled plugin) + provider logins.** Search providers
+  now have optional **Login / Password** fields (stored encrypted, like the API
+  key) that are passed securely to script plugins as `TH_USERNAME` / `TH_PASSWORD`
+  — so account-gated indexers work while scraping stays in userland. Ships a
+  ready-made `docs/search-plugins/rutracker.py` (stdlib-only: login, .org/.net/.nl
+  mirrors, a `cookie:<bb_session>` captcha fallback, concurrent magnet fetch). Add
+  a "Python Script" provider pointing at it, enter your RuTracker login, and search.
+- **Wider peer acquisition.** A single active torrent is no longer capped at ~55
+  peers (per-torrent ceiling raised to 100, global budget to 300 — safe because
+  slow-start + adaptive throttle still protect the router). Magnet links now also
+  get a larger curated default-tracker list unioned in (never `.torrent` files,
+  which may be from a private tracker). Plus an **experimental µTP transport**
+  toggle (Settings → Advanced) to reach µTP-only peers TCP misses — default off on
+  Windows, recovered safely by the auto-restarting engine if the native module
+  misbehaves.
 - **Smart network profiles.** Opt-in (Settings → Network → Smart network profiles):
   TorrentHunt detects which network you're on — keyed by the router (gateway MAC,
   so it works on Wi-Fi *and* Ethernet) — and automatically applies that network's

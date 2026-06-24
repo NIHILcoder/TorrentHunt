@@ -41,7 +41,8 @@ const SearchPage: React.FC = () => {
   const [showProviders, setShowProviders] = useState(false);
   const [providers, setProviders] = useState<SearchProvider[]>([]);
   const [newProvider, setNewProvider] = useState({
-    name: '', url: '', apiKey: '', type: 'jackett' as 'jackett' | 'torznab' | 'custom' | 'script', enabled: true
+    name: '', url: '', apiKey: '', username: '', password: '',
+    type: 'jackett' as 'jackett' | 'torznab' | 'custom' | 'script', enabled: true
   });
   const [savingProvider, setSavingProvider] = useState(false);
   const [testingId, setTestingId] = useState<string | null>(null);
@@ -127,7 +128,7 @@ const SearchPage: React.FC = () => {
     setSavingProvider(true);
     try {
       await window.api.search.addProvider(newProvider);
-      setNewProvider({ name: '', url: '', apiKey: '', type: 'jackett', enabled: true });
+      setNewProvider({ name: '', url: '', apiKey: '', username: '', password: '', type: 'jackett', enabled: true });
       await loadProviders();
     } catch (err: any) {
       alert(`Failed to add provider: ${err?.message}`);
@@ -438,6 +439,29 @@ const SearchPage: React.FC = () => {
                   />
                 )}
               </div>
+
+              {/* Optional login for auth'd indexers (e.g. a RuTracker plugin).
+                  Passed to script plugins as TH_USERNAME / TH_PASSWORD. */}
+              {newProvider.type === 'script' && (
+                <div className="form-row">
+                  <input
+                    type="text"
+                    className="form-input"
+                    placeholder={t('search.provider.login')}
+                    autoComplete="off"
+                    value={newProvider.username}
+                    onChange={e => setNewProvider(p => ({ ...p, username: e.target.value }))}
+                  />
+                  <input
+                    type="password"
+                    className="form-input"
+                    placeholder={t('search.provider.password')}
+                    autoComplete="off"
+                    value={newProvider.password}
+                    onChange={e => setNewProvider(p => ({ ...p, password: e.target.value }))}
+                  />
+                </div>
+              )}
 
               {/* Python status — only relevant for script plugins */}
               {newProvider.type === 'script' && (

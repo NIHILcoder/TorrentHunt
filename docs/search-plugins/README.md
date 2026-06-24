@@ -60,6 +60,23 @@ is dropped.
 A `{ "results": [ ... ] }` wrapper object is also accepted, so the same script can
 serve both this provider and the "Custom JSON" HTTP provider.
 
+## Credentials (for indexers that need a login)
+
+Some indexers (e.g. RuTracker) require an account. Put the login in the provider's
+**Login** / **Password** fields in TorrentHunt instead of hard-coding it in the
+script — the password is stored **encrypted** by the OS keychain (DPAPI / Keychain
+/ libsecret), never in plaintext. TorrentHunt passes them to the script as
+environment variables:
+
+| Env var           | From the provider field |
+|-------------------|-------------------------|
+| `TH_USERNAME`     | Login                   |
+| `TH_PASSWORD`     | Password                |
+| `TH_APIKEY`       | API Key                 |
+| `TH_PROVIDER_URL` | URL                     |
+
+Read them with `os.environ.get("TH_USERNAME")` etc.
+
 ## Limits & safety
 
 - The script runs **on your machine with your permissions** — only add scripts you
@@ -74,3 +91,7 @@ serve both this provider and the "Custom JSON" HTTP provider.
 - [`example_indexer.py`](example_indexer.py) — a minimal, runnable template.
 - [`qbittorrent_adapter.py`](qbittorrent_adapter.py) — run your existing
   **qBittorrent search plugins** through this provider (see its header).
+- [`rutracker.py`](rutracker.py) — **RuTracker** search. Add a Python Script
+  provider pointing at it and fill in your RuTracker Login/Password. Stdlib-only;
+  handles the .org/.net/.nl mirrors and a `cookie:<bb_session>` captcha fallback.
+  Verify the parser offline with `python rutracker.py --selftest`.
