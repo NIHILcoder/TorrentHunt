@@ -3,6 +3,19 @@
  */
 
 /**
+ * Turn a thrown value (often an Electron IPC error) into a clean, user-facing
+ * message. Electron wraps handler errors as
+ *   "Error invoking remote method 'downloads:add': Error: <real message>"
+ * which is noise to the user — strip the wrapper and the leading "Error:".
+ */
+export const cleanError = (e: unknown): string => {
+  let msg = e instanceof Error ? e.message : String(e ?? '');
+  msg = msg.replace(/^Error invoking remote method '[^']*':\s*/i, '');
+  msg = msg.replace(/^(Error:\s*)+/i, '');
+  return msg.trim() || 'Unknown error';
+};
+
+/**
  * Format bytes to human-readable size
  */
 export const formatBytes = (bytes: number): string => {

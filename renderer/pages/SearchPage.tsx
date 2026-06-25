@@ -6,6 +6,7 @@
 import React, { useState, useCallback, useEffect } from 'react';
 import { SearchResult, SearchProvider, PythonStatus } from '../../shared/types';
 import { Button, Icon, EmptyState } from '../components';
+import { cleanError } from '../utils/format-helpers';
 import { useTranslation } from '../utils/i18nContext';
 import './SearchPage.css';
 
@@ -112,8 +113,8 @@ const SearchPage: React.FC = () => {
       });
 
       setAddedIndices(prev => new Set(prev).add(idx));
-    } catch (err: any) {
-      alert(`Failed to add: ${err?.message || err}`);
+    } catch (err) {
+      alert(`Failed to add: ${cleanError(err)}`);
     } finally {
       setDownloading(prev => {
         const next = new Set(prev);

@@ -31,6 +31,7 @@ import {
   formatBytes, formatSpeed, formatEta, formatDate, getTypeIcon,
 } from './download-helpers';
 import { DownloadItem } from './DownloadItem';
+import { cleanError } from '../utils/format-helpers';
 import { useTranslation } from '../utils/i18nContext';
 
 
@@ -517,10 +518,7 @@ const DownloadsPage: React.FC<DownloadsPageProps> = ({
         'success'
       );
     } catch (error) {
-      addToast(
-        `Failed to add torrent: ${error instanceof Error ? error.message : 'Unknown error'}`,
-        'error'
-      );
+      addToast(`Failed to add torrent: ${cleanError(error)}`, 'error');
     }
   };
 
