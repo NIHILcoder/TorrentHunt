@@ -789,6 +789,16 @@ export class TorrentManager {
       // the infoHash checks above already catch true duplicates of the same
       // content — which is the only thing that would actually collide on disk.
 
+      // Engine-level guard: the WebTorrent client may still hold this infoHash
+      // even when our managed map doesn't (e.g. a soft-'removed' download whose
+      // torrent wasn't destroyed, or a map/engine desync). Re-adding it makes
+      // WebTorrent throw "Cannot add duplicate torrent" — which previously leaked
+      // to the UI as a raw "downloads:add" error. Catch it here with a clear one.
+      if (infoHashToCheck && this.client.get(infoHashToCheck)) {
+        log.warn('Duplicate torrent rejected (already present in the engine)', { infoHash: infoHashToCheck });
+        throw new TorrentError('This torrent is already in your downloads.', 'DUPLICATE');
+      }
+
       const settings = await db.getSettings();
       const savePath = params.savePath || settings.defaultDownloadDir;
 
@@ -1060,7 +1070,21 @@ export class TorrentManager {
         });
       }
 
-      const torrent = this.client.add(torrentInput, addOptions);
+      // client.add can throw synchronously — most often "Cannot add duplicate
+      // torrent <hash>" when the engine already holds this infoHash. Translate it
+      // into a clear, typed error instead of letting the raw message surface.
+      let torrent: Torrent;
+      try {
+        torrent = this.client.add(torrentInput, addOptions);
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : String(e);
+        if (/duplicate torrent/i.test(msg)) {
+          reject(new TorrentError('This torrent is already in your downloads.', 'DUPLICATE', id));
+        } else {
+          reject(new TorrentError(msg || 'Failed to add torrent to the engine', 'ADD_FAILED', id));
+        }
+        return;
+      }
 
       managed.torrent = torrent;
       // Snapshot lifetime totals so this session's bytes add onto them rather
