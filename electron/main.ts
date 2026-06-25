@@ -283,6 +283,19 @@ async function createWindow(): Promise<void> {
     backgroundColor: '#000000', // matches the app + splash; no flash before paint
   });
 
+  // Re-assert the window icon from a loaded image (belt-and-suspenders for the
+  // taskbar/thumbnail icon — the constructor `icon` option can be ignored on some
+  // Windows setups). NOTE: in `npm run dev` the taskbar button still shows
+  // electron.exe's icon (the host process); the packaged build embeds the real
+  // icon via electron-builder, and a wrong icon there is usually Windows' stale
+  // icon cache, not the app.
+  if (appIconPath) {
+    try {
+      const img = nativeImage.createFromPath(appIconPath);
+      if (!img.isEmpty()) mainWindow.setIcon(img);
+    } catch { /* keep the constructor icon */ }
+  }
+
   // Keep the instance label in the title bar: the renderer's <title> would
   // otherwise overwrite it the moment the page loads.
   if (isSecondaryInstance) {
