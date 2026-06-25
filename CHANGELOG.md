@@ -4,6 +4,15 @@ All notable changes to TorrentHunt are documented here.
 This project follows [Keep a Changelog](https://keepachangelog.com/) and
 [Semantic Versioning](https://semver.org/).
 
+## [2.3.1] - 2026-06-25
+
+### Fixed
+- **Clear error when adding a duplicate torrent.** Re-adding a torrent the engine
+  already has used to surface as a raw `downloads:add` failure; it now shows a
+  plain "This torrent is already in your downloads." — including magnets whose
+  infoHash can't be pre-read and torrents the engine still held after a removal.
+- **Window icon re-asserted** from a loaded image (taskbar/thumbnail robustness).
+
 ## [2.3.0] - 2026-06-24
 
 ### Added
