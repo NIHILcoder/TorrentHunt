@@ -4,6 +4,17 @@ All notable changes to TorrentHunt are documented here.
 This project follows [Keep a Changelog](https://keepachangelog.com/) and
 [Semantic Versioning](https://semver.org/).
 
+## [2.3.2] - 2026-06-25
+
+### Fixed
+- **RuTracker plugin showed the forum name instead of the torrent title.**
+  RuTracker puts `data-topic_id` on the row, so the parser grabbed the row's first
+  link (the forum) as the title (with the `√`/`*` status leaking in). Titles are
+  now read from the topic link (`viewtopic.php?t=…`) with HTML entities decoded;
+  the forum stays as the category. (Update your local `rutracker.py` copy.)
+- **Add-torrent errors no longer show Electron IPC noise** — the raw "Error
+  invoking remote method 'downloads:add'…" wrapper is stripped to just the message.
+
 ## [2.3.1] - 2026-06-25
 
 ### Fixed
