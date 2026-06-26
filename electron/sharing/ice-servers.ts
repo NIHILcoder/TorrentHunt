@@ -40,6 +40,19 @@ export const STUN_SERVERS: IceServer[] = [
 // or a managed key) in settings, which gets merged in here at connect time.
 export const TURN_SERVERS: IceServer[] = [];
 
+// Build the ICE entry for a user-supplied TURN relay (settings.customTurn*).
+// Returns [] when none is configured. Pure — safe to import in the hidden-window
+// engines. One side configuring TURN is enough to relay (its relay address is
+// publicly reachable), so this is the zero-infra ladder's optional last rung.
+export function customTurnToIce(url?: string, username?: string, credential?: string): IceServer[] {
+  const u = (url || '').trim();
+  if (!u) return [];
+  const s: IceServer = { urls: u };
+  if (username) s.username = username;
+  if (credential) s.credential = credential;
+  return [s];
+}
+
 // Rendezvous trackers (WebRTC signaling only). They broker the WebRTC handshake;
 // they never carry file bytes or any plaintext. We announce to all of them and
 // bittorrent-tracker tolerates any that are down, so multiple independent

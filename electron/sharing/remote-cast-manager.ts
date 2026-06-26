@@ -16,7 +16,7 @@ import { getTorrentManager } from '../torrent';
 const log = logger.child('RemoteCast');
 
 const RECEIVER_BASE = 'https://nihilcoder.github.io/TorrentHunt/watch/';
-import { TURN_SERVERS } from './ice-servers';
+import { customTurnToIce } from './ice-servers';
 
 type Pending = { resolve: (v: any) => void; reject: (e: Error) => void };
 
@@ -103,9 +103,14 @@ export class RemoteCastManager {
       this.active.set(key, sessionId);
     }
     let useTurn = true;
-    try { useTurn = (await db.getSettings()).shareUseTurn !== false; } catch { /* default on */ }
+    let turnServers: ReturnType<typeof customTurnToIce> = [];
+    try {
+      const s = await db.getSettings();
+      useTurn = s.shareUseTurn !== false;
+      turnServers = customTurnToIce(s.customTurnUrl, s.customTurnUsername, s.customTurnCredential);
+    } catch { /* default on, no custom TURN */ }
 
-    await this.call('start', { payload: { id: sessionId, contentPath: info.diskPath, ffmpeg, useTurn, turnServers: TURN_SERVERS } }, 15000);
+    await this.call('start', { payload: { id: sessionId, contentPath: info.diskPath, ffmpeg, useTurn, turnServers } }, 15000);
     const url = RECEIVER_BASE + '#' + sessionId + (useTurn ? '' : '|nt');
     return { url, sessionId };
   }

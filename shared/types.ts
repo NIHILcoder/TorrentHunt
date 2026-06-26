@@ -380,6 +380,13 @@ export interface AppSettings {
   shareUseTurn?: boolean;          // Use TURN relays for share links (default true).
                                    // Off = more private (no third-party relay) but
                                    // won't connect through symmetric NAT.
+  // Optional user-supplied TURN relay (zero-cost ladder, last resort). Covers the
+  // rare both-symmetric-NAT case that peer-relay can't, and relays file bytes too.
+  // One side configuring it is enough: that member's relay address is publicly
+  // reachable. Credential is encrypted at rest.
+  customTurnUrl?: string;          // e.g. "turn:relay.example.com:3478" ('' = none)
+  customTurnUsername?: string;
+  customTurnCredential?: string;
   updatedAt: Date;
 }
 

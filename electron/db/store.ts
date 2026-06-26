@@ -694,7 +694,7 @@ export async function updateDownloadFields(
 export async function getSettings(): Promise<AppSettings> {
   const s = configStore.get('settings');
   // Decrypt secrets transparently so callers always see plaintext
-  return { ...s, proxyPassword: decryptSecret(s.proxyPassword) };
+  return { ...s, proxyPassword: decryptSecret(s.proxyPassword), customTurnCredential: decryptSecret(s.customTurnCredential) };
 }
 
 export async function updateSettings(
@@ -702,13 +702,16 @@ export async function updateSettings(
 ): Promise<AppSettings> {
   const current = configStore.get('settings');
   const updated = { ...current, ...settings };
-  // Encrypt the proxy password at rest (only re-encrypt when it actually changed)
+  // Encrypt secrets at rest (only re-encrypt when they actually changed)
   if (settings.proxyPassword !== undefined) {
     updated.proxyPassword = encryptSecret(settings.proxyPassword);
   }
+  if (settings.customTurnCredential !== undefined) {
+    updated.customTurnCredential = encryptSecret(settings.customTurnCredential);
+  }
   configStore.set('settings', updated);
   // Return plaintext view to the caller
-  return { ...updated, proxyPassword: decryptSecret(updated.proxyPassword) };
+  return { ...updated, proxyPassword: decryptSecret(updated.proxyPassword), customTurnCredential: decryptSecret(updated.customTurnCredential) };
 }
 
 // === Cleanup ===

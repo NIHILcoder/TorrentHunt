@@ -112,6 +112,10 @@ const SettingsPage: React.FC = () => {
 
   // Sharing
   const [shareUseTurn, setShareUseTurn] = useState(true);
+  const [turnUrl, setTurnUrl] = useState('');
+  const [turnUser, setTurnUser] = useState('');
+  const [turnCred, setTurnCred] = useState('');
+  const [turnSaving, setTurnSaving] = useState(false);
 
   // Default seeding limits
   const [defaultSeedRatioLimit, setDefaultSeedRatioLimit] = useState(0);
@@ -337,6 +341,9 @@ const SettingsPage: React.FC = () => {
 
       // Sharing
       setShareUseTurn(s.shareUseTurn ?? true);
+      setTurnUrl(s.customTurnUrl ?? '');
+      setTurnUser(s.customTurnUsername ?? '');
+      setTurnCred(s.customTurnCredential ?? '');
 
       // Default seeding limits
       setDefaultSeedRatioLimit(s.defaultSeedRatioLimit ?? 0);
@@ -440,6 +447,23 @@ const SettingsPage: React.FC = () => {
       setMessage({ type: 'error', text: t('settings.msg.autosaveFailed') });
       await loadSettings();
     }
+  };
+
+  // Custom TURN relay — persisted on demand (used at the next connection, not live).
+  const saveTurn = async () => {
+    setTurnSaving(true);
+    const patch = {
+      customTurnUrl: turnUrl.trim(),
+      customTurnUsername: turnUser.trim(),
+      customTurnCredential: turnCred,
+    };
+    try {
+      await window.api.updateSettings(patch);
+      setSettings(prev => (prev ? { ...prev, ...patch } : prev));
+      setMessage({ type: 'success', text: t('settings.customTurn.saved') });
+    } catch {
+      setMessage({ type: 'error', text: t('settings.msg.autosaveFailed') });
+    } finally { setTurnSaving(false); }
   };
 
   // ── DNS-over-HTTPS ─────────────────────────────────────────────────────────
@@ -1128,6 +1152,42 @@ const SettingsPage: React.FC = () => {
           <div className="settings-notice-compact">
             <Icon name="info" size={14} />
             <span>{t('settings.shareTurn.note')}</span>
+          </div>
+
+          {/* Optional user-supplied TURN relay (zero-cost ladder, last resort) */}
+          <div className="doh-add">
+            <div className="doh-add-title">{t('settings.customTurn.title')}</div>
+            <div className="doh-add-row">
+              <input
+                className="input-compact input-mono"
+                style={{ flex: 2 }}
+                placeholder="turn:relay.example.com:3478"
+                value={turnUrl}
+                onChange={(e) => setTurnUrl(e.target.value)}
+              />
+              <input
+                className="input-compact"
+                style={{ flex: 1 }}
+                placeholder={t('settings.customTurn.user')}
+                value={turnUser}
+                onChange={(e) => setTurnUser(e.target.value)}
+              />
+              <input
+                className="input-compact"
+                style={{ flex: 1 }}
+                type="password"
+                placeholder={t('settings.customTurn.pass')}
+                value={turnCred}
+                onChange={(e) => setTurnCred(e.target.value)}
+              />
+              <Button variant="secondary" size="sm" onClick={saveTurn} loading={turnSaving} icon={<Icon name="check" size={14} />}>
+                {t('common.save')}
+              </Button>
+            </div>
+            <div className="settings-notice-compact">
+              <Icon name="info" size={14} />
+              <span>{t('settings.customTurn.note')}</span>
+            </div>
           </div>
         </div>
 

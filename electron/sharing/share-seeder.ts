@@ -22,7 +22,7 @@ const RECEIVER_BASE = 'https://nihilcoder.github.io/TorrentHunt/share/';
 
 // ICE servers + rendezvous trackers come from the shared module (see
 // ice-servers.ts). This preload runs with sandbox:false, so require() works.
-import { STUN_SERVERS, TURN_SERVERS, RENDEZVOUS_TRACKERS } from './ice-servers';
+import { STUN_SERVERS, RENDEZVOUS_TRACKERS } from './ice-servers';
 
 const SHARE_TRACKERS = RENDEZVOUS_TRACKERS;
 
@@ -43,10 +43,10 @@ const shares = new Map<string, ShareEntry>();
 
 function log(msg: string): void { try { ipcRenderer.send('share-log', msg); } catch { /* ignore */ } }
 
-function ensureClient(useTurn: boolean): any {
+function ensureClient(useTurn: boolean, turnServers: any[] = []): any {
   if (!client) {
     clientUseTurn = useTurn;
-    const iceServers = useTurn ? STUN_SERVERS.concat(TURN_SERVERS) : STUN_SERVERS;
+    const iceServers = useTurn ? STUN_SERVERS.concat(turnServers) : STUN_SERVERS;
     client = new WebTorrent({
       utp: false,
       dht: false,
@@ -62,13 +62,13 @@ function toInfo(e: ShareEntry) {
   return { downloadId: e.downloadId, name: e.name, infoHash: e.infoHash, magnetURI: e.magnetURI, link: e.link, createdAt: e.createdAt };
 }
 
-function doShare(downloadId: string, contentPath: string, name: string, useTurn: boolean): Promise<ShareEntry> {
+function doShare(downloadId: string, contentPath: string, name: string, useTurn: boolean, turnServers: any[] = []): Promise<ShareEntry> {
   const existing = shares.get(downloadId);
   if (existing) return Promise.resolve(existing);
   if (!fs.existsSync(contentPath)) {
     return Promise.reject(new Error('File not found on disk — the download must be complete to share'));
   }
-  const c = ensureClient(useTurn);
+  const c = ensureClient(useTurn, turnServers);
   return new Promise<ShareEntry>((resolve, reject) => {
     let settled = false;
     const onError = (err: any) => {
@@ -127,7 +127,7 @@ ipcRenderer.on('share-cmd', async (_e, msg: any) => {
   const { type, reqId } = msg;
   try {
     let data: any;
-    if (type === 'share') data = toInfo(await doShare(msg.downloadId, msg.contentPath, msg.name, msg.useTurn !== false));
+    if (type === 'share') data = toInfo(await doShare(msg.downloadId, msg.contentPath, msg.name, msg.useTurn !== false, msg.turnServers || []));
     else if (type === 'stop') { doStop(msg.downloadId); data = { ok: true }; }
     else if (type === 'get') data = getInfo(msg.downloadId);
     else if (type === 'list') data = Array.from(shares.values()).map(toInfo).sort((a, b) => b.createdAt - a.createdAt);

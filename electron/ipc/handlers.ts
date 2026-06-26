@@ -12,6 +12,7 @@ import { promisify } from 'util';
 import { logger, detectVPN, showVPNWarning, getAppIconPath } from '../utils';
 import { getRSSService } from '../services/rss-service';
 import { getShareManager, downloadContentPath } from '../sharing/share-manager';
+import { customTurnToIce } from '../sharing/ice-servers';
 import { getRoomManager } from '../sharing/room-manager';
 import { getSearchService } from '../services/search-service';
 import { getPythonStatus } from '../services/python-detector';
@@ -230,7 +231,8 @@ export function setupIpcHandlers(window: BrowserWindow): void {
         : downloadContentPath(download.savePath, download.name);
       const settings = await db.getSettings();
       const useTurn = settings.shareUseTurn !== false; // default on
-      return getShareManager().share(downloadId, contentPath, download.name, useTurn);
+      const turnServers = customTurnToIce(settings.customTurnUrl, settings.customTurnUsername, settings.customTurnCredential);
+      return getShareManager().share(downloadId, contentPath, download.name, useTurn, turnServers);
     }
   ));
 
