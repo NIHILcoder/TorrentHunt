@@ -4,6 +4,45 @@ All notable changes to TorrentHunt are documented here.
 This project follows [Keep a Changelog](https://keepachangelog.com/) and
 [Semantic Versioning](https://semver.org/).
 
+## [2.4.0] - 2026-06-27
+
+The rooms ("friend swarms") release: talk, personalise, and connect across more
+networks — all peer-to-peer, end-to-end encrypted, with no servers to pay for.
+
+### Added
+- **In-room chat.** Every room now has real-time text chat that rides the same
+  encrypted channel as the rest of the room. Messages are **signed with a per-device
+  key and bound to a member identity**, so even someone who has the invite code can't
+  post as another member; the chat history is **encrypted at rest** on your disk.
+- **Pick your avatar.** Your room profile can choose from several distinct avatar
+  styles (mirror, grid, rings, bauhaus) instead of a single fixed one. Avatars are
+  still generated on your device from a seed — nothing is ever uploaded.
+- **Peer-relay — rooms work across more networks, still with zero servers.** Two
+  members who can't reach each other directly (strict NAT) now connect **through any
+  other member who can reach both**, automatically. The relayed traffic stays
+  end-to-end encrypted, so the relaying member only ever forwards ciphertext.
+- **Bring-your-own TURN relay (optional).** For the rare case where both sides are
+  behind strict NAT and no member can relay, you can point the app at a TURN server
+  you trust (a free Cloudflare/metered tier or your own) in **Settings → Network →
+  Sharing**. One side configuring it is enough; the password is stored encrypted.
+- **Connection indicator.** Each member shows whether they're connected directly or
+  reached via a relay.
+
+### Changed
+- **Sturdier connectivity, less noise.** WebRTC ICE servers and rendezvous trackers
+  now come from a single shared list across rooms, share links and casting, with a
+  few extra STUN endpoints. The defunct bundled TURN relay (which only produced
+  "connection timed out" log spam) was removed in favour of the ladder above.
+
+### Fixed
+- **Room avatars no longer appear cropped** when the same avatar is shown at more
+  than one size at once (e.g. the header chip and the member grid).
+
+### Security
+- Rooms gain a per-install **Ed25519 signing identity** (private key encrypted at
+  rest). Chat messages are signed and verified with trust-on-first-use identity
+  binding, and the message log is encrypted on disk.
+
 ## [2.3.2] - 2026-06-25
 
 ### Fixed
