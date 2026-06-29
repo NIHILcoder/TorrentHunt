@@ -5,13 +5,26 @@
 ![License](https://img.shields.io/badge/License-MIT-green)
 ![Built with](https://img.shields.io/badge/Electron%20%2B%20React%20%2B%20WebTorrent-informational)
 
-A modern, privacy-focused desktop BitTorrent client built with Electron, React and
-WebTorrent. TorrentHunt keeps you in control — you bring your own indexers and feeds,
-and a **live privacy dashboard** shows exactly what the swarm can see about you. It also
-does the things classic clients can't: **stream a torrent to any device on your Wi-Fi
-or TV**, send files to a friend's **browser over WebRTC**, and run a private **room**
-where friends' files auto-sync and you can **chat end-to-end encrypted** — all
-peer-to-peer, no servers.
+**A private, serverless P2P hub that happens to speak BitTorrent.**
+
+TorrentHunt is a fully-featured torrent client — but that's the foundation, not the
+point. Its real job is the things classic clients *can't* do, all peer-to-peer with
+**no servers, no accounts, and nothing in the cloud**:
+
+- 📺 **Watch anywhere.** Stream a torrent *while it's still downloading* to your phone,
+  laptop or TV — even formats the browser can't natively play (transcoded on the fly).
+- 🔗 **Share without friction.** Send a finished download straight into a friend's
+  **browser** over a link — no install, no account on their side.
+- 👥 **Private friend rooms.** Spin up an invite-only **room** where everyone's files
+  auto-sync into a shared folder and you **chat, end-to-end encrypted and signed**.
+  Connections even hop between members, so a room works across home networks **without
+  any infrastructure of its own**.
+- 🛡️ **See what the swarm sees.** A live privacy dashboard shows your exposed IP, ISP
+  and VPN status, with IP-leak detection and a kill-switch.
+
+You bring your own indexers and feeds — TorrentHunt bundles none. Everything runs on
+your machine and directly between you and your peers: **the developer runs no servers,
+and the app costs nothing to operate.** Built with Electron, React and WebTorrent.
 
 > **Legal use only.** TorrentHunt does not bundle indexers for copyrighted material.
 > The only pre-seeded source is a Creative Commons / open-source RSS feed (FOSS Torrents),
