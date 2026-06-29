@@ -417,7 +417,7 @@ function applyContentSecurityPolicy(): void {
   const csp = [
     "default-src 'self'",
     "script-src 'self'",
-    "style-src 'self' 'unsafe-inline'", // CSS-in-JS / framer-motion inject inline styles
+    "style-src 'self' 'unsafe-inline'", // style-loader injects styles as inline <style> tags
     "img-src 'self' data: https: http:", // posters, QR codes, remote thumbnails
     "font-src 'self' data:",
     // Local-only WebTorrent streaming server (127.0.0.1:<random port>)
