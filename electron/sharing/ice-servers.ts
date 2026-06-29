@@ -37,8 +37,8 @@ export const STUN_SERVERS: IceServer[] = [
 // live here is defunct — a dead TURN entry only produces failed STUN-binding log
 // spam without helping. The rare both-peers-symmetric-NAT case is covered by
 // peer-relay; a user who still needs a relay can add their OWN (self-hosted coturn
-// or a managed key) in settings, which gets merged in here at connect time.
-export const TURN_SERVERS: IceServer[] = [];
+// or a managed key) in settings, which is merged in at connect time via the helper
+// below — so there is no bundled TURN_SERVERS list anymore.
 
 // Build the ICE entry for a user-supplied TURN relay (settings.customTurn*).
 // Returns [] when none is configured. Pure — safe to import in the hidden-window

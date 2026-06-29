@@ -298,12 +298,6 @@ export function randomAvatarBase(): string {
   return Math.floor(Math.random() * 0xffffffff).toString(36) + Date.now().toString(36).slice(-3);
 }
 
-/** A random complete avatar seed (style + base). */
-export function randomAvatarSeed(style?: AvatarStyle): string {
-  const s = style || AVATAR_STYLES[Math.floor(Math.random() * AVATAR_STYLES.length)];
-  return makeAvatarSeed(s, randomAvatarBase());
-}
-
 /**
  * A pool of candidate seeds for the picker: a spread across every style with a
  * couple of random bases each, shuffled. `current` (if given) is kept at the
