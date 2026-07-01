@@ -4,6 +4,24 @@ All notable changes to TorrentHunt are documented here.
 This project follows [Keep a Changelog](https://keepachangelog.com/) and
 [Semantic Versioning](https://semver.org/).
 
+## [2.6.0] - 2026-07-01
+
+### Added
+- **Instant-play streaming ("zero-wait").** Hitting Watch on a file now starts
+  playback almost immediately instead of waiting on the download: the engine
+  prioritizes the head of the file you're watching, requests the very first
+  pieces from every peer at once, and fills the buffer in playback order — so a
+  movie in a large, barely-started torrent plays in seconds. When you stop
+  watching, the torrent goes back to normal rarest-first downloading.
+- **One-click Watch / Listen.** Media downloads now show a Watch (or Listen)
+  button right on the row — previously the player was only reachable from the
+  right-click menu.
+- **Live swarm world map.** A new **Swarm** tab draws every peer you're connected
+  to on a real world map, grouped by country, with glowing nodes sized by how
+  many peers are there and arcs streaming toward your location. Peer locations
+  are resolved entirely offline on your machine — no peer address is ever sent
+  anywhere or shown in the app.
+
 ## [2.5.0] - 2026-06-29
 
 ### Fixed
